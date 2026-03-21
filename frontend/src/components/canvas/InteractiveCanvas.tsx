@@ -8,7 +8,8 @@ import {
   useEdgesState,
   useOnSelectionChange,
   addEdge,
-  BackgroundVariant
+  BackgroundVariant,
+  useReactFlow
 } from '@xyflow/react';
 import type { Connection, Edge, Node } from '@xyflow/react';
 import { WorkflowNode } from './CustomNode';
@@ -49,6 +50,7 @@ interface InteractiveCanvasProps {
 export default function InteractiveCanvas({ onNodeSelect }: InteractiveCanvasProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const { screenToFlowPosition } = useReactFlow();
 
   useOnSelectionChange({
     onChange: ({ nodes }) => {
@@ -110,10 +112,10 @@ export default function InteractiveCanvas({ onNodeSelect }: InteractiveCanvasPro
       const dataStr = event.dataTransfer.getData('application/reactflow');
       if (!dataStr) return;
 
-      const position = {
-        x: event.clientX - 300, // offset left panel
-        y: event.clientY - 80,  // offset top bar
-      };
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
 
       let type, label;
       try {
@@ -141,7 +143,7 @@ export default function InteractiveCanvas({ onNodeSelect }: InteractiveCanvasPro
 
       setNodes((nds) => nds.concat(newNode));
     },
-    [setNodes]
+    [setNodes, screenToFlowPosition]
   );
 
   useEffect(() => {
@@ -188,7 +190,7 @@ export default function InteractiveCanvas({ onNodeSelect }: InteractiveCanvasPro
   }, [setNodes, setEdges]);
 
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }} onDrop={onDrop} onDragOver={onDragOver}>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       
       {/* Swimlanes Background */}
       <div className="absolute inset-0 pointer-events-none flex z-0 opacity-40">
@@ -218,6 +220,8 @@ export default function InteractiveCanvas({ onNodeSelect }: InteractiveCanvasPro
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: 'default', animated: true, style: { stroke: '#3b82f6', strokeWidth: 2 } }}
