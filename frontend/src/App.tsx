@@ -70,27 +70,17 @@ function App() {
         )}
         
         {/* Top Navbar */}
-        <header className="h-14 bg-[#0f1115]/95 border-b border-white/10 flex items-center justify-between px-6 z-10 w-full shrink-0">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
+        <header className="h-14 bg-[#0f1115]/95 border-b border-white/10 flex items-center justify-between px-4 lg:px-6 z-10 w-full shrink-0">
+          
+          {/* Left: Branding & Skill Toggle */}
+          <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-3 cursor-default">
               <span className="text-xl">🧠</span>
-              <span className="font-bold text-lg tracking-tight hidden xl:block">Knowledge LLM Studio</span>
-            </div>
-            
-            {/* Breadcrumbs */}
-            <div className="flex items-center gap-2 text-xs text-slate-400 font-medium hidden lg:flex">
-              <span className="hover:text-slate-200 cursor-pointer">Project Alpha</span>
-              <span className="text-slate-600">/</span>
-              <span className="hover:text-slate-200 cursor-pointer text-slate-200">Main Pipeline</span>
-              <span className="text-slate-600">/</span>
-              <span className="text-blue-400 flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-                Building
-              </span>
+              <span className="font-bold text-lg tracking-tight hidden md:block">NeMo Studio UI</span>
             </div>
             
             {/* Skill Toggle */}
-            <div className="flex items-center ml-2 bg-black/40 rounded-lg border border-white/5 p-0.5" title="Persona Skill Level">
+            <div className="flex items-center bg-black/40 rounded-lg border border-white/5 p-0.5" title="Persona Skill Level">
               {(['beginner', 'intermediate', 'advanced'] as const).map(level => (
                 <button 
                   key={level}
@@ -103,8 +93,8 @@ function App() {
             </div>
           </div>
           
-          {/* Top Tabs */}
-          <nav className="flex items-center justify-center p-1 bg-white/5 rounded-lg border border-white/10 absolute left-1/2 -translate-x-1/2">
+          {/* Center: Top Tabs */}
+          <nav className="hidden lg:flex items-center justify-center p-1 bg-white/5 rounded-lg border border-white/10">
             {(['templates', 'build', 'simulate', 'review'] as const).map(tab => (
               <button 
                 key={tab}
@@ -116,11 +106,12 @@ function App() {
             ))}
           </nav>
           
-          <div className="flex items-center gap-2">
-            <button className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10 rounded-md">Save Draft</button>
-            <button className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10 rounded-md">Share</button>
-            <button onClick={onExportSlides} className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10 rounded-md hidden md:block">Export Slides</button>
-            <button className="px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2 ml-2">
+          {/* Right: Actions */}
+          <div className="flex items-center gap-3">
+            <button className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10 rounded-md hidden sm:block">Save Draft</button>
+            <button className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10 rounded-md hidden sm:block">Share</button>
+            <button onClick={onExportSlides} className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer border border-transparent hover:border-white/10 rounded-md hidden xl:block">Export Slides</button>
+            <button className="px-4 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
               Validate
             </button>
