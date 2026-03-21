@@ -1,4 +1,4 @@
-# Knowledge LLM Interactive Workflow
+# NeMo Studio UI
 An interactive visual application for explaining, simulating, and managing model training, data curation, synthetic data generation, and model updates.
 
 ## Architecture & Features

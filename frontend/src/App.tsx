@@ -45,7 +45,7 @@ function App() {
             <div className="w-full max-w-4xl bg-[#1a1d24] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
               <div className="p-8 text-center border-b border-white/5">
                 <div className="w-16 h-16 bg-blue-500/10 text-blue-400 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🧠</div>
-                <h2 className="text-2xl font-bold text-white mb-2">Welcome to Knowledge LLM Studio</h2>
+                <h2 className="text-2xl font-bold text-white mb-2">Welcome to NeMo Studio UI</h2>
                 <p className="text-slate-400 max-w-lg mx-auto">Select your experience level to customize your workspace. You can always change this later from the top navigation bar.</p>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/5 bg-[#14161b]">

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import simulate
 
 app = FastAPI(
-    title="Knowledge LLM Interactive Workflow API",
+    title="NeMo Studio UI API",
     description="Backend services for validating and simulating education model workflows.",
     version="1.0.0"
 )
@@ -20,4 +20,4 @@ app.include_router(simulate.router, prefix="/api/v1", tags=["simulation"])
 
 @app.get("/health")
 async def root():
-    return {"status": "ok", "message": "Knowledge LLM Server Running"}
+    return {"status": "ok", "message": "NeMo Studio UI Server Running"}

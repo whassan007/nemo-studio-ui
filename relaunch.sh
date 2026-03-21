@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo "========================================="
-echo "   Relaunching Knowledge LLM System      "
+echo "   Relaunching NeMo Studio UI            "
 echo "========================================="
 
 # Ensure we are executing from the script's directory

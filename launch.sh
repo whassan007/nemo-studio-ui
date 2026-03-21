@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 echo "========================================="
-echo "   Launching Knowledge LLM Workflow      "
+echo "   Launching NeMo Studio UI              "
 echo "========================================="
 
 # Function to clean up background processes on exit

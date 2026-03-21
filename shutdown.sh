@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-echo "Shutting down Knowledge LLM servers..."
+echo "Shutting down NeMo Studio UI servers..."
 
 # 1. Stop processes listening on port 8000 (Backend)
 PID_BACKEND=$(lsof -t -i :8000)
