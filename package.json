@@ -1,0 +1,15 @@
+{
+  "name": "nemo-studio-ui",
+  "version": "0.1.0",
+  "description": "Visual no-code LLM pipeline builder for the NVIDIA NeMo ecosystem",
+  "license": "Apache-2.0",
+  "author": "Waël Hassan <github.com/whassan007>",
+  "homepage": "https://huggingface.co/spaces/whassan/nemo-studio-ui",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whassan007/nemo-studio-ui.git"
+  },
+  "bugs": {
+    "url": "https://github.com/whassan007/nemo-studio-ui/issues"
+  }
+}

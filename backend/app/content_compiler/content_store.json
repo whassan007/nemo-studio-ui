@@ -1,0 +1,786 @@
+{
+  "lessons": {
+    "00_Workshop_Navigation": {
+      "title": "00 Workshop Navigation",
+      "sections": [
+        {
+          "type": "markdown",
+          "content": "# Workshop Navigator",
+          "cell_index": 0
+        },
+        {
+          "type": "markdown",
+          "content": "Each of the 4 sections of this workshop are running in their own containerized JupyterLab instances. Use the links below to navigate between them.",
+          "cell_index": 1
+        },
+        {
+          "type": "markdown",
+          "content": "<div>\n    <ul id=\"nav-links\">\n        <li><a href=\"/lab\">Section 1: Dataset Curation for Large Language Models</a></li>\n        <li><a href=\"/lab2\">Section 2: Evaluation and Light Customization of Large Language Models</a></li>\n        <li><a href=\"/lab3\">Section 3: Post Training: How to Continue Training Large Language Models</a></li>\n        <li><a href=\"/lab4\">Section 4: Generative AI Model Compression \u2013 Distillation, Quantization, Pruning</a></li>\n        <li><a href=\"/lab5\">Section 5: Coding Assessment</a></li>\n    </ul>\n</div>\n<script>\n    const links = document.querySelectorAll('#nav-links a');\n    links.forEach(link => {\n        link.href = window.location.origin + link.getAttribute('href');\n    });\n</script>",
+          "cell_index": 2
+        }
+      ]
+    },
+    "01_basics_curation": {
+      "title": "01 Basics Curation",
+      "sections": [
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 0
+        },
+        {
+          "type": "markdown",
+          "content": "# 1. Basics of Data Curation\n\n******\n\nGenerative AI development requires a heavy data curation process. The quality of the model largely depends on the quality of the data used for training. NVIDIA NeMo Curator is an open-source framework designed to streamline this process by preparing large-scale, high-quality datasets for pretraining and continuous training.\n\nNeMo Curator offers built-in workflows for curating data from various public sources such as Common Crawl, Wikipedia, and arXiv. At the same time, it provides the flexibility to customize pipelines to suit the specific needs of your project.\n\nThis notebook guides the process of basic data preparation involved in most Language Models developments: \n\n**[1.1 Text Cleaning and Unification](#1.1-Text-Cleaning-and-Unification)<br>**\n**[1.2 Document Size Filtering](#1.2-Document-Size-Filtering)<br>**\n**[1.3 Filter Personally Identifiable Information (PII)](#1.3-Filter-Personally-Identifiable-Information-(PII))<br>**",
+          "cell_index": 1
+        },
+        {
+          "type": "markdown",
+          "content": "***************\n### Environment Setup\n\nFor large-scale data processing, NeMo Curator provides both GPU and CPU based modules. Understanding how these modules interact and how to configure your environment is key to optimizing performance.\n\nCPU-based modules rely on [Dask](https://www.dask.org/) to distribute computations across multi-node clusters while GPU-accelerated modules uses [RAPIDS](https://rapids.ai/) to handle large-scale datasets efficiently.\n\nLet's check first your current environment.",
+          "cell_index": 2
+        },
+        {
+          "type": "markdown",
+          "content": "NeMo Curator provides a simple function `get_client` that can be used to start a local Dask cluster or connect to an existing one.  Let's initialize the Dask Cluster. \n\nThe next cell starts a Dask `LocalCluster` on your CPU. It can be reused for all modules except for deduplication, which requires a GPU cluster.",
+          "cell_index": 5
+        },
+        {
+          "type": "markdown",
+          "content": "Learn more about Nemo Curator's CPU and GPU Modules with Dask in the dedicated [documentation](https://docs.nvidia.com/nemo-framework/user-guide/latest/datacuration/cpuvsgpu.html)",
+          "cell_index": 7
+        },
+        {
+          "type": "markdown",
+          "content": "## 1.1 Multilingual Datasets\n\nIn this notebook, we will use a subset of the [MC4](https://huggingface.co/datasets/allenai/c4), the C4 Multilingual Dataset.\n\nFor the sake of this exercise, to create a more diverse dataset:\n- We merged Spanish and French samples (100 per language)\n- We duplicated all samples (making 200 samples per language)\n- We shuffled the samples\n\nSo, we have 400 samples, 200 from each language. The structure is a JSON format with 3 fields: `text`, `timestamp` and `url`. \n\nLet's have a look at the dataset:",
+          "cell_index": 8
+        },
+        {
+          "type": "markdown",
+          "content": "Notice, **languages are not annotated in the dataset**, allowing us to leverage AI-based language separation later in the workflow.",
+          "cell_index": 12
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now create a document dataset from a pandas data frame. For more information on the arguments see Dask's from_pandas documentation\n\nNeMo Curator's `DocumentDataset` employs Dask's distributed dataframes to manage large datasets across multiple nodes and allow for easy restarting of interrupted curation. `DocumentDataset` supports reading and writing to sharded *jsonl* and *parquet* files both on local disk and from remote sources such as S3 bukets.\n\nLet's load our multilingual dataset with Nemo Curator",
+          "cell_index": 13
+        },
+        {
+          "type": "markdown",
+          "content": "## 1.2 Basic Text cleaning and Unification\n\nNeMo Curator provides various `DocumentModifier` implementations such as the `UnicodeReformatter` which uses [ftfy](https://pypi.org/project/ftfy/) (fixes text for you) to resolve all unicode issues in the dataset. \n\nIt is also possible to implement your custom text cleaner using `DocumentModifier`. For instance, we can standardize inconsistent quotation marks that appear very often in curated large dataset, remove HTML, URLs, and email tags, etc.\n\n\nLet's first create the output folders to save the cleaned step outputs:",
+          "cell_index": 17
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now implement a custom text cleaner `QuotationTagUnifier`.\n\nIt is designed to modify text documents by normalizing quotation marks and removing unwanted elements. \n\nThe result is a cleaned and standardized text output.",
+          "cell_index": 19
+        },
+        {
+          "type": "markdown",
+          "content": "Next, we can chain modifiers together using the `Sequential` class, which takes a list of operations to be run sequentially and applies them to a given `DocumentDataset`.\n \nLet's call this sequence the `cleaners`:",
+          "cell_index": 22
+        },
+        {
+          "type": "markdown",
+          "content": "Let's run that on a toy example with few sentences:",
+          "cell_index": 24
+        },
+        {
+          "type": "markdown",
+          "content": "Now, let's apply our sequence of cleaners to the toy samples. To execute this sequence on the Dask cluster, we use `.persist()`, which keeps the transformed data in memory for optimized processing.",
+          "cell_index": 26
+        },
+        {
+          "type": "markdown",
+          "content": "Let's check the output.\n\nExpected output are samples with normalized quotations, removed tabs and HTML, URL and Email tags.",
+          "cell_index": 28
+        },
+        {
+          "type": "markdown",
+          "content": "Now, let's apply this cleaning step to our multilingual dataset. We can achieve this by creating a sequence of curation steps, starting with the cleaning sequence as the first function in our data curation pipeline.\n\nRun the next cell to create the cleaning step as a function that would be the first curation step.",
+          "cell_index": 30
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now execute this step on our multilingual dataset:",
+          "cell_index": 32
+        },
+        {
+          "type": "markdown",
+          "content": "Let's check some outputs:",
+          "cell_index": 34
+        },
+        {
+          "type": "markdown",
+          "content": "We can save the created Document into a json file.",
+          "cell_index": 36
+        },
+        {
+          "type": "markdown",
+          "content": "## Dataset document size Filtering\n\nExtremely short documents may lack sufficient context or information for the model to learn meaningful concepts. By filtering out such documents, we can ensure that the data used for training is sufficiently informative and balanced.\n\nLet's explore how to apply word counts and filtering using NeMo Curator.",
+          "cell_index": 39
+        },
+        {
+          "type": "markdown",
+          "content": "The following code defines a function, `filter_dataset`, that cleans a `DocumentDataset` by applying several filters:\n\n- **Word Count Filter**: Removes documents with fewer than 80 words by default.\n- **Incomplete Document Filter**: Removes incomplete documents.\n- **Repeating N-Grams Filters**: Removes documents with excessive repetition of word sequences (2-grams, 3-grams, 4-grams) above certain thresholds (20%, 18%, 16% respectively).\n\nThese filters are applied sequentially to refine the dataset.",
+          "cell_index": 42
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now apply that on our multilingual dataset:",
+          "cell_index": 44
+        },
+        {
+          "type": "markdown",
+          "content": "We can check the outputs. Notice that a new field named `word_count` has been added:",
+          "cell_index": 46
+        },
+        {
+          "type": "markdown",
+          "content": "Let's save the output, we need to create the folder first.",
+          "cell_index": 48
+        },
+        {
+          "type": "markdown",
+          "content": "Check the saved file by running the next cell.",
+          "cell_index": 51
+        },
+        {
+          "type": "markdown",
+          "content": "### 1.3 PII Identification and Removal\n\nThe Personal Identifiable Information (PII) identification tool is designed to remove sensitive data from datasets.\n\nThe identification leverages [presidio_analyzer](https://pypi.org/project/presidio-analyzer/) a Python based service for detecting PII entities in text.\n\nLet's try to analyze a toy sample: *My name is Dana and my number is 212-555-5555*\n\nExpected output is the type `PERSON` and `PHONE_NUMBER` and the char start and end position.\n\n```\n type: PERSON, start: 11, end: 15, score: 0.85,\n type: PHONE_NUMBER, start: 33, end: 45, score: 0.75\n```",
+          "cell_index": 53
+        },
+        {
+          "type": "markdown",
+          "content": "Run the analyzer for French sample:",
+          "cell_index": 55
+        },
+        {
+          "type": "markdown",
+          "content": "Try your own examples in these three languages for accurate results.",
+          "cell_index": 57
+        },
+        {
+          "type": "markdown",
+          "content": "Nemo Curator integrates PII Identification and Removal efficiently leveraging Dask for parallelization. The tool currently supports the identification and removal of the following sensitive data types:\n\n`ADDRESS`,`CREDIT_CARD`,`EMAIL_ADDRESS`,`DATE_TIME`,`IP_ADDRESS`,`LOCATION`,`PERSON`,`URL`,`US_SSN`,`US_PASSPORT`,`US_DRIVER_LICENSE`,`PHONE_NUMBER`,\n\nLet's run the Nemo Curator PII Identification `PiiModifier` on a toy sample.",
+          "cell_index": 59
+        },
+        {
+          "type": "markdown",
+          "content": "Let's build and apply the `PiiModifier` on the toy sample.",
+          "cell_index": 61
+        },
+        {
+          "type": "markdown",
+          "content": "Now, let's integrate this PII identification step into our curation sequence and apply it to the multilingual dataset. This will ensure that sensitive data is properly detected and removed while maintaining data quality. \n\nLet's create first the `redact_pii` function for PII identification and removal.",
+          "cell_index": 64
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now run the sequence of curation steps including the PII removal function",
+          "cell_index": 66
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now save the filtered data. We need to create the folder to save the output.",
+          "cell_index": 69
+        },
+        {
+          "type": "markdown",
+          "content": "The current PII removal in Nemo Curator implementation is limited to HPC clusters using Slurm as the resource manager. Check the [documentation](https://github.com/NVIDIA/NeMo-Curator/blob/main/docs/user-guide/personalidentifiableinformationidentificationandremoval.rst) for more details.",
+          "cell_index": 73
+        },
+        {
+          "type": "markdown",
+          "content": "---\n<h2 style=\"color:green;\">Congratulations!</h2>\n\nIn this notebook, you have used Nemo Curator to apply a sequence of basic text curation steps designed to clean and preprocess the dataset.\n\nBefore moving on to the next notebook, make sure to stop the Dask cluster. Please run the next cell.",
+          "cell_index": 74
+        },
+        {
+          "type": "markdown",
+          "content": "We are now ready to move to the next notebook to explore advanced data preparation steps. \n\nLet's move to the [02_advanced_data_processing](02_advanced_data_processing.ipynb)",
+          "cell_index": 76
+        },
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 77
+        }
+      ]
+    },
+    "02_advanced_data_processing": {
+      "title": "02 Advanced Data Processing",
+      "sections": [
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 0
+        },
+        {
+          "type": "markdown",
+          "content": "# 2. Advanced Data Processing\n\n\nIn this notebook, we will use NeMo Curator to perform several crucial data cleaning steps, such as language detection and filtering, topic classification, and deduplication. \n\nThis notebook is structured as follows:\n- First, we will explore language detection and filtering to separate our multilingual dataset by language.\n- Next, we will dive into topic classification to categorize the datasets into relevant themes.\n- Finally, we will explore document deduplication, covering both exact and fuzzy methods.\n\n\n**[2.1 Language Separation](#2.1-Language-Separation)<br>**\n**[2.2 Domain Classification](#2.2-Domain-Classification)<br>**\n**[2.3 Documents Deduplication](#2.3-Deduplication)<br>**",
+          "cell_index": 1
+        },
+        {
+          "type": "markdown",
+          "content": "***************\n### Environment Setup",
+          "cell_index": 2
+        },
+        {
+          "type": "markdown",
+          "content": "The next cell starts a Dask LocalCluster on your GPU cluster.",
+          "cell_index": 4
+        },
+        {
+          "type": "markdown",
+          "content": "Let's load the multilingual dataset.",
+          "cell_index": 6
+        },
+        {
+          "type": "markdown",
+          "content": "## 2.1 Language Separation\n\nIn this section, we will use a language classification model by [fasttext](https://fasttext.cc/docs/en/language-identification.html). \n\n\nLet's first create the output folders and download the fasttext model for text language detection:",
+          "cell_index": 9
+        },
+        {
+          "type": "markdown",
+          "content": "Let's create the filter which uses the downloaded fasttext model.",
+          "cell_index": 12
+        },
+        {
+          "type": "markdown",
+          "content": "Now, let's apply the language detection filter on our multilingual dataset.",
+          "cell_index": 15
+        },
+        {
+          "type": "markdown",
+          "content": "Let's check the detected language for each sample. \n\nNotice the new fields `language` in the output with the language code `FR/EN/ES`and the classification score.",
+          "cell_index": 17
+        },
+        {
+          "type": "markdown",
+          "content": "Let's separate documents by the language label and save each language separately. This will create sub-folders for each languages under the output path.",
+          "cell_index": 19
+        },
+        {
+          "type": "markdown",
+          "content": "We can check the output jsonl file per language.",
+          "cell_index": 22
+        },
+        {
+          "type": "markdown",
+          "content": "## 2.2 Domain Classification\n\nNemo Curator supports various text classification models allowing data annotation, useful for cleaning and data blending. Check the documentation for [distributed data classification](https://github.com/NVIDIA/NeMo-Curator/blob/main/tutorials/distributed_data_classification/README.md).\n\n\nEach classifier is available on Hugging Face Hub. When run with NeMo Curator, they are accelerated using RAPIDS [CrossFit](https://github.com/rapidsai/crossfit) library.\n\n\nIn this section, we will experiment with the `MultilingualDomainClassifier` a Multilingual Domain Classifier that support 52 languages and annotate 26 domain classes:\n\n`Arts_and_Entertainment`, `Autos_and_Vehicles`, `Adult`,`Beauty_and_Fitness`, `Books_and_Literature`, `Business_and_Industrial`, `Computers_and_Electronics`, `Finance`, `Food_and_Drink`, `Games`, `Health`, `Hobbies_and_Leisure`, `Home_and_Garden`, `Internet_and_Telecom`, `Jobs_and_Education`, `Law_and_Government`, `News`, `Online_Communities`, `People_and_Society`, `Pets_and_Animals`, `Real_Estate`, `Science`, `Sensitive_Subjects`, `Shopping`, `Sports`, `Travel_and_Transportation`\n\nThe model architecture is a transformer-based encoder Deberta V3 Base available on Hugging Face Hub. Learn more about the classifier [MultilingualDomainClassifier Model's Card](https://huggingface.co/nvidia/multilingual-domain-classifier).\n\n\nLet's set the output folder for domain classification.",
+          "cell_index": 25
+        },
+        {
+          "type": "markdown",
+          "content": "First, let's apply the Multilingual Domain Classifier on a toy multilingual dataset. Let's create the dataset with multiple languages and topics.",
+          "cell_index": 27
+        },
+        {
+          "type": "markdown",
+          "content": "We can define the `MultilingualDomainClassifier` filter as follows. \n\nOn its first run, it will download the DeBERTa model from the Hugging Face Hub.",
+          "cell_index": 29
+        },
+        {
+          "type": "markdown",
+          "content": "Now, let's run the filter on our multilingual multi topics toy samples.",
+          "cell_index": 31
+        },
+        {
+          "type": "markdown",
+          "content": "Check the outputs. Notice the new field `domain_pred`. Example of expected outputs: \n```\nIl adore les chats.\t                                Pets_and_Animals\nInvesting in index funds is a popular strategy...\tFinance\nIr de compras en el centro comercial es una ex...\tShopping\nDzi\u0119ki wykorzystaniu analizy danych programy t...\tSports\n.\u062a\u0642\u062f\u0645 \u0627\u0644\u062a\u0637\u0648\u0631\u0627\u062a \u0627\u0644\u062d\u062f\u064a\u062b\u0629 \u0641\u064a \u0627\u0644\u0639\u0644\u0627\u062c \u0627\u0644\u062c\u064a\u0646\u064a \u0623\u0645\u0644\u0627\u064b ...\t        Health\n...\n```",
+          "cell_index": 33
+        },
+        {
+          "type": "markdown",
+          "content": "Now, let's use the `MultilingualDomainClassifier` to process our previously filtered multilingual corpus (French and Spanish).",
+          "cell_index": 35
+        },
+        {
+          "type": "markdown",
+          "content": "Let's check the output. Expected to see an additional field `domain_pred`:\n```\ntext                                            \t\tdomain_pred\nDragon Ball: Le 20e film de la sage sortira le...\t\tArts_and_Entertainment\nCours D'histoire Des \u00c9tats Europ\u00e9ens: Depuis L...\t\tBooks_and_Literature\nSe realiz\u00f3 una jornada de promoci\u00f3n del buentr...\t\tPeople_and_Society\n...\n```\n\nExecute the following cell to review the topic predictions:",
+          "cell_index": 37
+        },
+        {
+          "type": "markdown",
+          "content": "Let's now save the output.",
+          "cell_index": 39
+        },
+        {
+          "type": "markdown",
+          "content": "We can check the saved outputs by executing the next cell:",
+          "cell_index": 41
+        },
+        {
+          "type": "markdown",
+          "content": "## 2.3 Deduplication\n\nDocument-level deduplication aims to reduce the occurrence of duplicate and near-duplicate documents in a dataset. This is crucial for datasets cleaning, reducing redundancy, and ensuring that models are trained on diverse and unique data.\n\nIn this section, we will explore both the Exact and Fuzzy deduplication. Both functionalities are supported in NeMo Curator and accelerated using the [RAPIDS](https://rapids.ai/) library.",
+          "cell_index": 43
+        },
+        {
+          "type": "markdown",
+          "content": "Remember, we created our multilingual (Spanish and French) dataset by deduplicating each sample once.\nBefore running deduplication, we need to ensure that each document in the dataset has a unique ID. We can use the `add_id` module within NeMo Curator to accomplish this.",
+          "cell_index": 44
+        },
+        {
+          "type": "markdown",
+          "content": "### 2.3.1 Add Unique ID\n\nLet's start by adding a unique ID for out dataset separated per language (Spanish and French)",
+          "cell_index": 46
+        },
+        {
+          "type": "markdown",
+          "content": "Let's run the `AddId` on the French corpus by running the next cell. The Format of output ID will be `<prefix>_<id>` where `prefix` is provided and `id` is a generated unique number. \n\nLet's apply the `AddId` function to the French corpus by running the next cell. The output ID format will be `<prefix>_<id>`, where `prefix` is specified by the user, and `id` is a uniquely generated number.\n\n\nExample of expected output:\n```\ntext\t                                         \t\tid\nDragon Ball: Le 20e film de la sage sortira le...\t\tFR_data-0000000000\nCours D'histoire Des \u00c9tats Europ\u00e9ens: Depuis L...\t\tFR_data-0000000001\n...\n```\n\nExecute the following cell to apply `AddId` to the French corpus, user prefix here is set to `FR_data`:",
+          "cell_index": 47
+        },
+        {
+          "type": "markdown",
+          "content": "Let's check the outputs. Notice the new field `id`.",
+          "cell_index": 49
+        },
+        {
+          "type": "markdown",
+          "content": "We can save the outputs in their designated folder.",
+          "cell_index": 51
+        },
+        {
+          "type": "markdown",
+          "content": "#### Exercice:  Add Unique ID for Spanish data.\nMake sure to replace the `# Your code here`. If you get stuck, refer to the solution below.",
+          "cell_index": 53
+        },
+        {
+          "type": "markdown",
+          "content": "### 2.3.2 Exact Deduplication\n\nExact Deduplication consists in identifying and removing duplicate documents that are exactly identical within a dataset. This process helps eliminate redundant data, prevents models from overfitting on repeated examples, and ensures that training and test sets do not contain the same samples, which could otherwise lead to misleading evaluation metrics.\n\nIn [NeMo Curator](https://docs.nvidia.com/nemo-framework/user-guide/latest/datacuration/gpudeduplication.html), exact deduplication works by hashing each document and keeping only one document per hash, and it can be run on both GPU ([CuDF](https://docs.rapids.ai/api/cudf)) and CPU ([Pandas](https://pandas.pydata.org/)) based backends.\n\n\nLet's create the folders for the exact deduplication. We will save the output results in `/data`, temporary files in `/cache`, and logs in `/log`.",
+          "cell_index": 56
+        },
+        {
+          "type": "markdown",
+          "content": "Before running exact deduplication in NeMo Curator, the dataset needs to present a unique ID for each document (sample). We already added these unique IDs in the previous step in the field `\"id\"`.\n\nWe will be running the exact deduplication on the GPU using cudf backend.",
+          "cell_index": 58
+        },
+        {
+          "type": "markdown",
+          "content": "Execute the next cell to run the exact deduplication on the Spanish dataset. This should take about 10 seconds to process.\n\nWe can use `perform_removal=True` to apply the duplicate removal directly on the dataset. But, for the sake of this exercise, we will first show the deduplication identification before actually applying the removal.",
+          "cell_index": 60
+        },
+        {
+          "type": "markdown",
+          "content": "Check how many detected documents have duplicates:",
+          "cell_index": 62
+        },
+        {
+          "type": "markdown",
+          "content": "Check some duplicate documents: \n\nExample of output: \n```\n     id                  _hashes\n18   ES_data-0000000146 2f610eed57653fbe68328fbaf3274c2a\n20   ES_data-0000000148  e473009ec2e1a246de93fea08488ca4c\n21   ES_data-0000000149  066347c8a96bc73056a9f172e4d9710\n\n```",
+          "cell_index": 64
+        },
+        {
+          "type": "markdown",
+          "content": "Now, apply the deduplication removal and save the results to the output data folder.",
+          "cell_index": 66
+        },
+        {
+          "type": "markdown",
+          "content": "Check saved output file.",
+          "cell_index": 68
+        },
+        {
+          "type": "markdown",
+          "content": "#### Exercise: Run Exact Deduplication for the French data.\n\nRun the same exact deduplication for the French data. \n\nLet's first create the relevant folders and set the dataset and id field.",
+          "cell_index": 70
+        },
+        {
+          "type": "markdown",
+          "content": "Run the deduplication. Make sure to replace the `# Your code here`. If you get stuck, refer to the solution below.",
+          "cell_index": 72
+        },
+        {
+          "type": "markdown",
+          "content": "Check how many detected documents have duplicates:",
+          "cell_index": 75
+        },
+        {
+          "type": "markdown",
+          "content": "Now, apply the deduplication removal and save the results to the output data folder.",
+          "cell_index": 77
+        },
+        {
+          "type": "markdown",
+          "content": "### 2.3.3 Fuzzy Deduplication\n\nRemoving near-duplicates is referred to as fuzzy deduplication at the document level, which is based on Jaccard similarity scores.\n\nThis approach can be broken down into the following stages:\n- **Stage 1 - Minhash + LSH:** The first step involves generating MinHash signatures for the documents. NeMo Curator currently supports character-based n-grams for MinHashing. Then, the Locality Sensitive Hashing (LSH) is performed to identify candidate duplicates.\n- **Stage 2 - LSH Buckets to Graph edgelist:** LSH buckets are directly converted to edges for the connected components computation.\n- **Stage 3 - Connect Components:** Since LSH is an approximate method, documents that are near duplicates may end up in different buckets, with some overlapping documents between them. A GPU-accelerated connected components algorithm is used to identify all connected components in the graph formed by the edges between documents within the same bucket. The output of this step is a list of document IDs and the groups they belong to.\n\nAll documents within the same group are considered near duplicates, and results can then be used to remove them from the corpus.\nFor more information, refer to the Deduplication documentation of [NeMo Curator](https://docs.nvidia.com/nemo-framework/user-guide/latest/datacuration/gpudeduplication.html).\n\n\nThere are no near-duplicates in out example datasets. However, to demonstrate the process, let's run fuzzy deduplication on the French dataset and go through the steps involved.\n\nLet's create first the output folder.",
+          "cell_index": 81
+        },
+        {
+          "type": "markdown",
+          "content": "Let's start the Dask client. Make sure that you have stopped the previous one before proceeding.",
+          "cell_index": 83
+        },
+        {
+          "type": "markdown",
+          "content": "We will use the `FuzzyDuplicates` method from NeMo Curator to run the fuzzy deduplication process on the French dataset. This will allow us to identify and handle any near-duplicates based on similarity scores.\n\nYou should see the three stages logged during the process.",
+          "cell_index": 86
+        },
+        {
+          "type": "markdown",
+          "content": "The result from the connected components stage is a list of document IDs and the group they belong to. All documents in the same group are considered near duplicates. \n\n```\nid\t                group\nFR_data-0000000062\t46\nFR_data-0000000013\t47\nFR_data-0000000104\t160\nFR_data-0000000185\t161\nFR_data-0000000155\t65\n...\n```\nLet's check the outputs. Notice the `group` field.",
+          "cell_index": 89
+        },
+        {
+          "type": "markdown",
+          "content": "These groups can be then used to remove the near duplicates from the corpus.\n\nLet's run that by executing the next cell.",
+          "cell_index": 91
+        },
+        {
+          "type": "markdown",
+          "content": "Check how many detected documents have duplicates:",
+          "cell_index": 93
+        },
+        {
+          "type": "markdown",
+          "content": "#### [Optional] Explore further Deduplication on downstream tasks\n\nLarge Language Models are typically evaluated based on their performance on downstream tasks using unseen test data. However, when working with extensive datasets, there is a risk of test data leaking into the model's training set. \n\nTo mitigate this, NeMo Curator provides a Decontamination strategy, in order to ensure that any document sections appearing in downstream tasks are removed from the training set. \n\nYou can explore this in more detail in the [task decontamination](https://docs.nvidia.com/nemo-framework/user-guide/latest/datacuration/taskdecontamination.html) of NeMo Curator documentation.",
+          "cell_index": 95
+        },
+        {
+          "type": "markdown",
+          "content": "---\n<h2 style=\"color:green;\">Congratulations!</h2>\n\n\nIn this notebook, you have used NeMo Curator to apply several data cleaning steps, including language detection and filtering, topic classification and document deduplication. These steps help ensure that the dataset is clean, diverse, and free from redundant data, improving the quality of the data used for training and evaluation.\n\nBefore moving on to the next notebook, make sure to stop the Dask cluster. Please run the next cell.",
+          "cell_index": 96
+        },
+        {
+          "type": "markdown",
+          "content": "Move to the next notebook to explore synthetic data generation with NeMo Curator. This will allow us to learn how to create artificial data for various tasks, enhancing the diversity and richness of our dataset.\n\nLet's move to the [synthetic_data_generation](03_synthetic_data_generation.ipynb).",
+          "cell_index": 98
+        },
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 99
+        }
+      ]
+    },
+    "03_synthetic_data_generation_topics_and_subtopics": {
+      "title": "03 Synthetic Data Generation Topics And Subtopics",
+      "sections": [
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 0
+        },
+        {
+          "type": "markdown",
+          "content": "# 3. Generating Topics and Subtopics with NeMo Curator\n\nIn this notebook, we will demonstrate how to generate synthetic data using **[NVIDIA NeMo Curator](https://github.com/NVIDIA/NeMo-Curator/)**, a powerful tool designed to create high-quality datasets for training large language models (LLMs).\n\nSynthetic data generation is particularly valuable when real-world data is limited, noisy, or difficult to obtain. NeMo Curator simplifies this process by providing prebuilt pipelines and customizable modules that allow developers to generate, filter, and refine synthetic datasets efficiently. \n\nBy leveraging its synthetic data generation capabilities, we will produce a diverse list of **topics and subtopics in English and Spanish**.",
+          "cell_index": 1
+        },
+        {
+          "type": "markdown",
+          "content": "**[3.1 NeMo Curator OpenAI Client](#3.1-NeMo-Curator-OpenAI-Client)<br>**\n**[3.2 Topics-Subtopics Generation in English and Spanish](#3.2-Topics-Subtopics-Generation-in-English-and-Spanish)<br>**",
+          "cell_index": 2
+        },
+        {
+          "type": "markdown",
+          "content": "---",
+          "cell_index": 3
+        },
+        {
+          "type": "markdown",
+          "content": "## Connecting to the NVIDIA API Catalog",
+          "cell_index": 4
+        },
+        {
+          "type": "markdown",
+          "content": "NeMo Curator supports connecting to [OpenAI API](https://github.com/openai/openai-python?tab=readme-ov-file#openai-python-api-library) compatible services and [NeMo Deploy](https://docs.nvidia.com/nemo-framework/user-guide/latest/deployingthenemoframeworkmodel.html#use-nemo-export-and-deploy-module-apis-to-run-inference) services.\n\nIn this notebook, we rely on the `build.nvidia.com` API endpoints. You can use this same flow with a model deployed as an NVIDIA NIM for LLMs which can be found [here](https://github.com/NVIDIA/NeMo-Curator/blob/main/docs/user-guide/syntheticdata.rst#connecting-to-an-llm-service).",
+          "cell_index": 5
+        },
+        {
+          "type": "markdown",
+          "content": "Your environment already has an NVIDIA API key installed for you. For work outside of this workshop environment, please see the instructions below for how to obtain your own free NVIDIA API key.",
+          "cell_index": 6
+        },
+        {
+          "type": "markdown",
+          "content": "### Obtaining Your Own NVIDIA API Key",
+          "cell_index": 7
+        },
+        {
+          "type": "markdown",
+          "content": "If you would like an NVIDIA API key for your own work outside this workshop environment, you can generate one for free using the following steps:\n\n1. Login (or sign up) through [build.nvidia.com](https://build.nvidia.com/explore/discover).\n2. Click the `Get API Key` button available on the the `nvidia/nemotron-mini-4b-instruct` page, found [here](https://build.nvidia.com/nvidia/nemotron-mini-4b-instruct).",
+          "cell_index": 8
+        },
+        {
+          "type": "markdown",
+          "content": "---",
+          "cell_index": 9
+        },
+        {
+          "type": "markdown",
+          "content": "## 3.1 NeMo Curator OpenAI Client",
+          "cell_index": 10
+        },
+        {
+          "type": "markdown",
+          "content": "We are going to:\n\n1. Initialize OpenAI's client.\n2. Initialize NeMo Curator's `OpenAIClient`\n3. Perform a request, and print the LLM response.\n\nNotice that the structure of the request is very close to the original OpenAI client.",
+          "cell_index": 11
+        },
+        {
+          "type": "markdown",
+          "content": "## 3.2 Topics-Subtopics Generation in English and Spanish\n\nThe NeMo Curator Synthetic Data Generation (SDG) features are primarily accessed through the `NemotronGenerator` class.\n\nThis useful wrapped helps expose both: \n\n1. Pre-built SDG pipelines \n2. A number of specific generation utilities.\n\nBefore heading into the pre-built pipelines, we're going to \"break-apart\" an existing pipeline, in this case: the Topics-Subtopics Generation Pipeline - and see the granular customization that Nemo Curator provides for each step. \n\nWe're going to work through the following process (extracted from [Nemotron-4 340B Technical Report](https://arxiv.org/pdf/2406.11704)):\n\n1. Generate `n` Macro Topics - Have our LLM generate `n` broad topics relating to daily life, the world, etc.\n2. Generate `n` Sub Topics - Have our LLM take each Macro Topic and generate `n` topics relating to the Macro Topics.\n\n### 3.2.1 Generating `n` Macro Topics in English and Spanish\n\nOur first step is to generate our Macro Topics. \n\nLet's look at the prompt that drives this process as well, to get a better understanding of what's happening \"under the hood\":\n\n```python\n\"Can you generate {n_macro_topics} comprehensive topics that encompass various aspects of our daily life, the world, and science? Your answer should be a list of topics. Make the topics as diverse as possible. For example, 1. Food and drinks. \\n2. Technology.\\n\"\n```\n\nTo do this, we'll use the [`generate_macro_topics`](https://github.com/NVIDIA/NeMo-Curator/blob/cd4c4907bd4d87cd11d0f37be4ae0fe167a79696/nemo_curator/synthetic/nemotron.py#L115) method of our `NemotronGenerator`.\n\n> NOTE: All prompt templates are fully customizable, and we'll take a look at how we can do that in the upcoming cells!",
+          "cell_index": 15
+        },
+        {
+          "type": "markdown",
+          "content": "While this is a great start - we'd love to have this response in a Python list. \n\nWe'll use the NeMo Curator `convert_response_to_yaml_list` method to accomplish this goal. \n\nPlease notice that currently, this method is quite strict. Custom parsing might be required depending on model choice, and use-case.",
+          "cell_index": 17
+        },
+        {
+          "type": "markdown",
+          "content": "Let\u2019s replicate the process in Spanish. To do this, we simply need to modify the prompt accordingly:",
+          "cell_index": 20
+        },
+        {
+          "type": "markdown",
+          "content": "**Exercise:** Generate `n_macro_topics` in a language other than Spanish or English.\n\nIf you are not fluent in another language, use an LLM or an online translation tool (e.g., [Google Translate](https://translate.google.com), [DeepL](https://www.deepl.com/)) to translate one of the previous prompts into your chosen language.\n\nOnce translated, run the pipeline to generate macro topics in that language.\n\nAfterward, reflect on the results:\n\n- Did the topics align with the intended meaning of the original prompt?\n- Were there any noticeable differences in diversity or quality compared to the topics generated in Spanish or English?",
+          "cell_index": 23
+        },
+        {
+          "type": "markdown",
+          "content": "### 3.2.2 Generating `n` Subtopics in English and Spanish\n\nWe will follow the same procedure as before; however, this time, the prompt will be tailored to specify the generation of subtopics.",
+          "cell_index": 25
+        },
+        {
+          "type": "markdown",
+          "content": "As we did earlier, we will utilize the `convert_response_to_yaml_list` method to transform the LLM response into a Python list.",
+          "cell_index": 28
+        },
+        {
+          "type": "markdown",
+          "content": "Let\u2019s replicate the process in Spanish. To do this, we simply need to modify the prompt accordingly:",
+          "cell_index": 30
+        },
+        {
+          "type": "markdown",
+          "content": "**Exercise:** Generate `n_subtopics` for a macro topic in a language other than Spanish or English.\n\nAfterward, reflect on the results:\n- Did the subtopics align with the intended meaning of the original prompt?\n- Were there any noticeable differences in diversity, specificity, or quality compared to subtopics generated in Spanish or English?",
+          "cell_index": 32
+        },
+        {
+          "type": "markdown",
+          "content": "---\n<h2 style=\"color:green;\">Congratulations!</h2>\n\nIn this notebook, you used Nemo Curator to generate lists of topics and subtopics in both English and Spanish.\n\nIn the next notebook, we will select a subtopic to create a **Question-and-Answer Dataset for Supervised Fine-Tuning (SFT)**, available in both languages.\n<img src=\"./images/DLI_Header.png\" style=\"width: 400px; float: right;\">",
+          "cell_index": 34
+        }
+      ]
+    },
+    "04_synthetic_data_generation_questions_and_answers": {
+      "title": "04 Synthetic Data Generation Questions And Answers",
+      "sections": [
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 0
+        },
+        {
+          "type": "markdown",
+          "content": "# 4. Generating High-Quality Questions and Answers with NeMo Curator\n\nThis notebook demonstrates how to create a high-quality question-answer dataset for supervised fine-tuning (SFT) using **NVIDIA NeMo Curator**. The process involves leveraging the **Llama-3.1-nemotron-70b-reward model**, a leaderboard topping reward model supporting RLHF for better alignment with human preferences.\n\n### Importance of an SFT Dataset\n\nSupervised fine-tuning is critical for tailoring pre-trained large language models (LLMs) to specialized applications. While pre-trained models possess broad general knowledge, they often lack precision in specific domains. An SFT dataset provides labeled question-answer pairs that guide the model during fine-tuning, enabling it to learn domain-specific patterns and improve its accuracy and reliability.\n\nWithout such datasets, models may fail to meet user expectations or perform consistently in specialized use cases. High-quality question-answer pairs are essential for effective fine-tuning, enhancing the model's real-world applicability.\n\n### Advantages of Synthetic Data for SFT\n\nUsing synthetic data to build an SFT dataset offers several benefits:\n\n- **Scalability**: Enables rapid generation of diverse question-answer pairs across various topics, especially when human-curated datasets are unavailable.\n- **Cost-effectiveness**: Reduces the expense of manual annotation while allowing iterative refinement to meet evolving requirements.\n- **Comprehensive Coverage**: Ensures alignment with predefined subtopics and includes rare or edge-case scenarios that may not be present in existing datasets.\n- **Improved Robustness**: Enhances the model's ability to handle complex or uncommon situations effectively.\n\nBy generating synthetic question-answer pairs aligned with specific subtopics, this approach facilitates the creation of tailored, efficient SFT datasets. This ensures fine-tuned models perform optimally in their intended domains while streamlining the development process.",
+          "cell_index": 1
+        },
+        {
+          "type": "markdown",
+          "content": "**[4.1 NeMo Curator OpenAI Client](#4.1-NeMo-Curator-OpenAI-Client)<br>**\n**[4.2 Developing a Q&A Dataset for SFT in English and Spanish](#4.2-Developing-a-Q&A-Dataset-for-SFT-in-English-and-Spanish)<br>**\n**[4.3 Evaluating Question/Answer Pairs Using a Reward Model](#4.3-Evaluating-Question/Answer-Pairs-Using-a-Reward-Model)<br>**",
+          "cell_index": 2
+        },
+        {
+          "type": "markdown",
+          "content": "---",
+          "cell_index": 3
+        },
+        {
+          "type": "markdown",
+          "content": "## Connecting to the NVIDIA API Catalog",
+          "cell_index": 4
+        },
+        {
+          "type": "markdown",
+          "content": "NeMo Curator supports connecting to [OpenAI API](https://github.com/openai/openai-python?tab=readme-ov-file#openai-python-api-library) compatible services and [NeMo Deploy](https://docs.nvidia.com/nemo-framework/user-guide/latest/deployingthenemoframeworkmodel.html#use-nemo-export-and-deploy-module-apis-to-run-inference) services.\n\nIn this notebook, we rely on the `build.nvidia.com` API endpoints. You can use this same flow with a model deployed as an NVIDIA NIM for LLMs which can be found [here](https://github.com/NVIDIA/NeMo-Curator/blob/main/docs/user-guide/syntheticdata.rst#connecting-to-an-llm-service).",
+          "cell_index": 5
+        },
+        {
+          "type": "markdown",
+          "content": "Your environment already has an NVIDIA API key installed for you. For work outside of this workshop environment, please see the instructions below for how to obtain your own free NVIDIA API key.",
+          "cell_index": 6
+        },
+        {
+          "type": "markdown",
+          "content": "### Obtaining Your Own NVIDIA API Key",
+          "cell_index": 7
+        },
+        {
+          "type": "markdown",
+          "content": "If you would like an NVIDIA API key for your own work outside this workshop environment, you can generate one for free using the following steps:\n\n1. Login (or sign up) through [build.nvidia.com](https://build.nvidia.com/explore/discover).\n2. Click the `Get API Key` button available on the the `Llama 3.1 Nemotron 70B Reward` page, found [here](https://build.nvidia.com/nvidia/llama-3_1-nemotron-70b-reward).",
+          "cell_index": 8
+        },
+        {
+          "type": "markdown",
+          "content": "---",
+          "cell_index": 9
+        },
+        {
+          "type": "markdown",
+          "content": "## 4.1 NeMo Curator OpenAI Client\n\nWe will begin by initializing NeMo Curator's `OpenAI Client`.\n\nPlease note that this step is identical to the process outlined in the previous notebook.",
+          "cell_index": 10
+        },
+        {
+          "type": "markdown",
+          "content": "## 4.2 Developing a Q&A Dataset for SFT in English and Spanish\n\nIn this section, we will use the subtopics generated earlier to create a supervised fine-tuning (SFT) dataset of questions and answers.\n\nThese subtopics provide a structured foundation for generating diverse and relevant queries, ensuring the dataset comprehensively covers the target domain. \n\nTo create the SFT dataset, we will follow a systematic process to ensure the quality and relevance of the generated question-and-answer pairs. The steps include:  \n\n- **Generating a List of Questions**  \n- **Revising Questions to Add Detail**\n- **Generating a List of Answers**\n- **Evaluating Question/Answer Pairs**\n\nBy following these steps, we aim to produce a robust and well-structured SFT dataset that enhances the fine-tuning process and improves the model's performance in its target domain.",
+          "cell_index": 12
+        },
+        {
+          "type": "markdown",
+          "content": "### 4.2.1 Generating a List of Questions in English and Spanish\n\nUsing the subtopics as a foundation, we will create an initial set of questions that broadly address the key aspects of each subtopic. To accomplish this, we use the `generate_questions_from_topic` function, which generates a list of diverse and relevant questions for a given topic by leveraging a language model. This method ensures that the generated questions are aligned with the intended domain and provide a solid starting point for further refinement.\n\nThe `generate_questions_from_topic` function relies on the `generate_open_qa_from_topic` method from the `generator` object. Once the model generates a response, it converts the output into a structured list format using `convert_response_to_yaml_list`.\n\nFor English-language topics, we will use the following default prompt template:\n\n```python\n\"Can you generate {n_openlines} questions or requests related to {topic}? The questions and requests should be as diverse possible. Your answer should be a list.\"\n```\n\nThis prompt instructs the model to generate a specified number of diverse questions or requests related to the given topic and ensures that the output is formatted as a list. By focusing on diversity, this approach captures various perspectives and nuances within each subtopic.\n\nThis method ensures that even if errors occur during generation, retries are attempted to maximize success. The resulting list of questions provides a diverse and comprehensive foundation for subsequent steps in creating a supervised fine-tuning (SFT) dataset.\n\nBy using this approach, we can efficiently generate high-quality questions tailored to each subtopic, ensuring that our dataset captures the breadth and depth necessary for fine-tuning large language models effectively.",
+          "cell_index": 13
+        },
+        {
+          "type": "markdown",
+          "content": "Let\u2019s replicate the process in Spanish. To do this, we simply need to modify the prompt accordingly:",
+          "cell_index": 15
+        },
+        {
+          "type": "markdown",
+          "content": "### 4.2.2 Revising Questions to Add Detail  \n\nThe generated questions will be refined to ensure they are specific, clear, and detailed enough to elicit precise and informative answers. To achieve this, we will use the `revise_questions` function, which iteratively processes a list of questions and revises them using a language model. The goal is to enhance each question by adding context, improving clarity, or rephrasing it into a more elaborate or diverse format.\n\nThe `revise_questions` function utilizes the `revise_open_qa` method from the `generator` object. For each question in the input list, it attempts to generate a revised version by applying the specified prompt template.\n\nFor English-language questions, we will use the following default prompt template:\n\n```python\n\"Question: {openline}\\n\\nCan you revise the question above to include more contexts or details? The revised questions can be any of the follows:\\n1. Adding some context to the original question. The context might state the importance of the question, explain background knowledge, or add other reasonable information.\\n2. Change the questions into a different format or style, e.g., imperative statements, length requirements for the answer, etc.\\n3. Elongated questions that require to elaborate on specific topic or discuss a certain point.\\n4. Any other related questions or statements.\\n\\nThe revised question should contain two, three, or four sentences. You should generate {n_revisions} revised questions or statements in a list. Make them as diverse as possible.\"\n```\n\nThis prompt guides the model to revise each question in various ways, such as adding context, rephrasing into different styles, or elaborating on specific aspects. The diversity of revisions ensures that each question is enriched with additional detail while maintaining relevance to its original intent.\n\nThis approach ensures that each question is refined into a more detailed and contextually rich version while handling errors gracefully through retries. By leveraging this method, we produce a high-quality set of revised questions that are better suited for generating precise and informative answers in subsequent steps.",
+          "cell_index": 17
+        },
+        {
+          "type": "markdown",
+          "content": "Let\u2019s replicate the process in Spanish. To do this, we simply need to modify the prompt accordingly:",
+          "cell_index": 19
+        },
+        {
+          "type": "markdown",
+          "content": "### 4.2.3 Generating a List of Answers  \n\nFor each question, we will generate corresponding answers that are accurate, comprehensive, and aligned with the intended domain knowledge. To achieve this, we will use the `generate_dialogue` method to simulate a dialogue between a user and an assistant. In this simulation, the user asks a question, and the assistant provides an answer. The dialogue is restricted to only one turn to ensure simplicity and focus on generating precise question-answer pairs.\n\nThe `generate_dialogue` method takes in the revised question as the opening line (`openline`) and uses both the user and assistant models (in this case, the same model) to simulate the interaction. This ensures consistency in tone and style between the question and answer.\n\nFor English-language dialogues, we will use the default template provided below:\n\n```python\n\"Here is a conversation between a user and an assistant.\\n<|The Start of Assistant's Conversation with User|>\\n{conversation_history}\\n<|The End of Assistant's Conversation with User|>\\n\\nGiven the conversation above, generate a followup request or question in the tone of User. Directly give me the question without extraneous words.\"\n```\n\nThis template establishes a clear structure for the conversation, ensuring that both the user\u2019s input and the assistant\u2019s response are well-defined. By restricting the dialogue to one turn, we maintain control over the generated content while ensuring that each answer directly addresses its corresponding question without unnecessary elaboration. This approach allows us to systematically create high-quality question-and-answer pairs for inclusion in our supervised fine-tuning (SFT) dataset.",
+          "cell_index": 21
+        },
+        {
+          "type": "markdown",
+          "content": "We will replicate the process in Spanish by simply adjusting the prompt accordingly, using the same approach we followed before.",
+          "cell_index": 23
+        },
+        {
+          "type": "markdown",
+          "content": "## 4.3 Evaluating Question/Answer Pairs Using a Reward Model\nEach question-answer pair will be rewarded based on correctness, clarity, and alignment with the subtopic. This step ensures that the dataset maintains high-quality standards and is suitable for fine-tuning the model effectively.  \n\nWe can use the same client to query NVIDIA's [leaderboard](https://huggingface.co/spaces/allenai/reward-bench) Reward Model - [llama-3.1-nemotron-70b-reward](https://build.nvidia.com/nvidia/llama-3_1-nemotron-70b-reward).\n\nThe model expects a conversation between a User and an Assistant, following the pattern:\n\n    messages = [\n        {\n            \"role\": \"user\", \n            \"content\": \"User input\"\n        },\n        {\n            \"role\": \"assistant\",\n            \"content\": \"Assistant output\"\n        }\n    ]\n\nThe Llama-3.1-Nemotron-70B-Reward model provides a single floating-point reward score that reflects the overall quality of the assistant's response. This score evaluates attributes such as helpfulness, factual correctness, coherence, and alignment with the prompt. Scores are typically negative, with higher (less negative) values indicating better-quality responses for the same prompt. Scores are not directly comparable across different prompts and can vary widely, sometimes reaching values like -60 or lower for poor responses.\n\nThe score can be used to:\n- **Rank responses**: Compare multiple responses to the same prompt, with higher scores indicating better quality.\n- **Filter responses**: Set a threshold to exclude low-quality responses, adjusting based on your use case.\n- **Guide optimization**: Use in reinforcement learning from human feedback (RLHF) to improve model alignment.\n\nFor general use, the raw floating-point score is recommended for precise evaluation.\n\nHere is an example demonstrating how to use that model:",
+          "cell_index": 25
+        },
+        {
+          "type": "markdown",
+          "content": "We can use this following helper function to make our work more concise.",
+          "cell_index": 27
+        },
+        {
+          "type": "markdown",
+          "content": "In the code snippet below, the `compose_messages` function creates a list of dictionaries representing a user-assistant message exchange. Each dictionary contains two keys: `\"role\"`, which specifies whether the message is from the user or assistant, and `\"content\"`, which holds the respective message content. The function accepts two arguments: `user_content` for the user's input and `assistant_content` for the assistant's response.\n\nTo use this function, the example demonstrates calling `compose_messages` with specific question-answer pairs from the `questions_answers_english` list. `questions_answers_english[\"question\"]` provides the user's question, and `questions_answers_english[\"answer\"]` supplies the assistant's response.\n\nThe resulting `message` variable contains a structured list of dictionaries that can be used as input to our reward model.",
+          "cell_index": 31
+        },
+        {
+          "type": "markdown",
+          "content": "Let's assess the quality of the provided question and answer pair:",
+          "cell_index": 32
+        },
+        {
+          "type": "markdown",
+          "content": "To determine whether a question/answer pair is valid for our SFT dataset, we will evaluate its reward score and set a minimum threshold of -20.0 to retain the pair. \n\nWe will encapsulate this logic in a method named `reward_questions_answer` to streamline the evaluation process and ensure consistency across the dataset.",
+          "cell_index": 34
+        },
+        {
+          "type": "markdown",
+          "content": "In this case, evaluating the questions and answers in Spanish does not require modifying the prompt, as our reward model is capable of understanding Spanish.\n\nThe code would be as follows:",
+          "cell_index": 36
+        },
+        {
+          "type": "markdown",
+          "content": "---\n<h2 style=\"color:green;\">Congratulations!</h2>\n\nIn this notebook, you used Nemo Curator to generate question-and-answer lists for a specific subtopic in both English and Spanish.\n\nIn the next notebook, we will explore how to generate **Math Problems Along With Their Solutions** on a specific topic, provided in both languages.\n<img src=\"./images/DLI_Header.png\" style=\"width: 400px; float: right;\">",
+          "cell_index": 38
+        }
+      ]
+    },
+    "05_synthetic_data_generation_math_problems_with_solutions": {
+      "title": "05 Synthetic Data Generation Math Problems With Solutions",
+      "sections": [
+        {
+          "type": "markdown",
+          "content": "<img src=\"./images/DLI_Header.png\" style=\"width: 400px;\">",
+          "cell_index": 0
+        },
+        {
+          "type": "markdown",
+          "content": "# 5. Generating Math Problems and Solutions with NeMo Curator\n\nIn this notebook, we will demonstrate how to use **NVIDIA NeMo Curator** to generate a set of math problems and their solutions on a specific topic.\n\nThe generated outputs will then be evaluated using the **Llama-3.1-nemotron-70b-reward model** to ensure quality and relevance.",
+          "cell_index": 1
+        },
+        {
+          "type": "markdown",
+          "content": "**[5.1 NeMo Curator OpenAI Client](#5.1-NeMo-Curator-OpenAI-Client)<br>**\n**[5.2 Math problems generation in English and Spanish](#5.2-Math-problems-generation-in-English-and-Spanish)<br>**\n**[5.3 Combining subtopics and math problems generation to create a diverse set of math problems in English and Spanish](#5.3-Combining-subtopics-and-math-problems-generation-to-create-a-diverse-set-of-math-problems-in-English-and-Spanish)<br>**",
+          "cell_index": 2
+        },
+        {
+          "type": "markdown",
+          "content": "---",
+          "cell_index": 3
+        },
+        {
+          "type": "markdown",
+          "content": "## Connecting to the NVIDIA API Catalog",
+          "cell_index": 4
+        },
+        {
+          "type": "markdown",
+          "content": "NeMo Curator supports connecting to [OpenAI API](https://github.com/openai/openai-python?tab=readme-ov-file#openai-python-api-library) compatible services and [NeMo Deploy](https://docs.nvidia.com/nemo-framework/user-guide/latest/deployingthenemoframeworkmodel.html#use-nemo-export-and-deploy-module-apis-to-run-inference) services.\n\nIn this notebook, we rely on the `build.nvidia.com` API endpoints. You can use this same flow with a model deployed as an NVIDIA NIM for LLMs which can be found [here](https://github.com/NVIDIA/NeMo-Curator/blob/main/docs/user-guide/syntheticdata.rst#connecting-to-an-llm-service).",
+          "cell_index": 5
+        },
+        {
+          "type": "markdown",
+          "content": "Your environment already has an NVIDIA API key installed for you. For work outside of this workshop environment, please see the instructions below for how to obtain your own free NVIDIA API key.",
+          "cell_index": 6
+        },
+        {
+          "type": "markdown",
+          "content": "### Obtaining Your Own NVIDIA API Key",
+          "cell_index": 7
+        },
+        {
+          "type": "markdown",
+          "content": "If you would like an NVIDIA API key for your own work outside this workshop environment, you can generate one for free using the following steps:\n\n1. Login (or sign up) through [build.nvidia.com](https://build.nvidia.com/explore/discover).\n2. Click the `Get API Key` button available on the the `Llama 3.1 Nemotron 70B Reward` page, found [here](https://build.nvidia.com/nvidia/llama-3_1-nemotron-70b-reward).",
+          "cell_index": 8
+        },
+        {
+          "type": "markdown",
+          "content": "---",
+          "cell_index": 9
+        },
+        {
+          "type": "markdown",
+          "content": "## 5.1 NeMo Curator OpenAI Client\n\nWe will begin by initializing NeMo Curator's `OpenAI Client`.\n\nPlease note that this step is identical to the process outlined in the previous notebook.",
+          "cell_index": 10
+        },
+        {
+          "type": "markdown",
+          "content": "## 5.2 Math problems generation in English and Spanish\nWe will generate math problems based on a specific subtopic. Instead of using the `convert_response_to_yaml_list` method, we will create and use **a custom parser**.\n\nIn order to do it, we will slightly modify the default `MATH_PROBLEM_GENERAL_PROMPT_TEMPLATE`, and will use the following instead:\n\n```python\n    \"Create {n_openlines} diverse mathematics problems related to the topic '{topic}' \" \\\n    \"or solvable using concepts from '{topic}'. Provide your response as a numbered list, \" \\\n    \"and include both the problem description and its solution. Format your response as follows: \" \\\n    \"((###1###)) >>>Problem<<<: [Description of the first problem]. >>>Solution<<<: [Solution to the first problem].\\n\" \\\n    \"((###2###)) >>>Problem<<<: [Description of the second problem]. >>>Solution<<<: [Solution to the second problem].\\n\" \\\n    \"Only include the problems and their solutions\u2014no additional text.\"\n```",
+          "cell_index": 12
+        },
+        {
+          "type": "markdown",
+          "content": "In this case, we will use a customer parser to clean our list of questions/answers.",
+          "cell_index": 14
+        },
+        {
+          "type": "markdown",
+          "content": "Now it\u2019s time to do the same in Spanish. To accomplish this, we simply need to adjust the prompt as follows:",
+          "cell_index": 16
+        },
+        {
+          "type": "markdown",
+          "content": "## 5.3 Combining subtopics and math problems generation to create a diverse set of math problems in English and Spanish\n\nNow it's time to bring together everything we've covered so far. To achieve this, we will begin by generating a list of `n` math subtopics and then create `m` pairs of problem-solution sets for each subtopic.\n\nLet's begin with the English language!",
+          "cell_index": 18
+        },
+        {
+          "type": "markdown",
+          "content": "**Exercise:** Using `nvidia/llama-3.1-nemotron-70b-reward`, filter the generated examples to retain only those that meet a certain quality threshold.",
+          "cell_index": 21
+        },
+        {
+          "type": "markdown",
+          "content": "---\n<h2 style=\"color:green;\">Congratulations!</h2>\n\nIn this notebook, you used Nemo Curator to generate math problems along with their solutions on a specific topic in both English and Spanish.\n\n<img src=\"./images/DLI_Header.png\" style=\"width: 400px; float: right;\">",
+          "cell_index": 23
+        }
+      ]
+    }
+  },
+  "ui_panels": [],
+  "math_cards": []
+}

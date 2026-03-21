@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Exclude proprietary files and model weights
+backend/static/models/*.bin
+knowledge_source/slides_history/*.pptx
+backend/static/images/DLI_Header.png
