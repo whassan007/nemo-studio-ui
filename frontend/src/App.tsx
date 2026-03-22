@@ -518,13 +518,15 @@ function Sidebar({skill,search,onSearch,onDragStart}: any){
 }
 
 /* ── PIPELINE NODE ── */
-function PNode({comp,selected,onClick,onRemove}: any){
+function PNode({comp,selected,onClick,onRemove,status}: any){
   const color=SC[comp.s];
   const stage=STAGES.find(s=>s.id===comp.s);
+  const clz = `pnode${selected?' sel':''}${status?` ${status}`:''}`;
+  const sclz = `pn-status ${status||'ok'}`;
   return(
-    <div className={`pnode${selected?' sel':''}`} onClick={()=>onClick(comp.id)}>
+    <div className={clz} onClick={()=>onClick(comp.id)}>
       <div className="pn-hdr" style={{background:color+'18',color}}>{stage?.label.toUpperCase()}</div>
-      <div className="pn-status ok"/>
+      <div className={sclz}/>
       <button className="pn-rm" onClick={(e: any)=>{e.stopPropagation();onRemove(comp.id);}}>✕</button>
       <div className="pn-body">
         <div className="pn-irow">
@@ -654,6 +656,107 @@ function TmplModal({onClose,onLoad}: any){
   );
 }
 
+/* ── SIMULATE PANEL ── */
+function SimPanel({ordered, simState, setSimState, notify}: any) {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  
+  React.useEffect(() => {
+    if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [simState.logs]);
+
+  React.useEffect(() => {
+    if(simState.status !== 'running') return;
+    const idx = simState.activeIdx;
+    
+    if (idx >= ordered.length) {
+      setSimState((p:any)=>({...p, status:'done'}));
+      notify('✅ Simulation complete!');
+      return;
+    }
+
+    const comp = ALL.find(c=>c.id===ordered[idx]);
+    const delay = comp && comp.s === 4 ? 2000 : 1000;
+    
+    setSimState((p:any) => ({...p, logs: [...p.logs, `[${new Date().toLocaleTimeString()}] ▶ Starting: ${comp?.name}...`]}));
+    
+    const t1 = setTimeout(() => {
+      setSimState((p:any) => ({...p, logs: [...p.logs, `[${new Date().toLocaleTimeString()}] ✓ Completed: ${comp?.name}`], activeIdx: idx + 1}));
+    }, delay);
+
+    return () => clearTimeout(t1);
+  }, [simState.status, simState.activeIdx, ordered]);
+  
+  const handleStart = () => {
+    if (ordered.length === 0) { notify('Pipeline empty. Build first.'); return; }
+    setSimState({ activeIdx: 0, logs: [`[${new Date().toLocaleTimeString()}] Initializing cluster...`,`[${new Date().toLocaleTimeString()}] Loading dependencies...`], status: 'running' });
+  };
+
+  return (
+    <div className="pcontent">
+      <div className="ptitle">Simulation Console</div>
+      <div className="sim-ctrls">
+        <button className="sbtn play" onClick={handleStart} disabled={simState.status==='running'}>▶ Start Run</button>
+        <button className="sbtn stop" onClick={()=>setSimState((p:any)=>({...p,status:'idle'}))} disabled={simState.status!=='running'}>⏸ Stop</button>
+        <button className="sbtn" onClick={()=>setSimState({activeIdx:-1, logs:[], status:'idle'})}>✕ Clear</button>
+      </div>
+      <div className="sim-term" ref={scrollRef}>
+        {simState.logs.length===0 && <div style={{color:'#666',fontStyle:'italic'}}>Press Start to run simulation...</div>}
+        {simState.logs.map((L:string, i:number)=>(
+          <p key={i}><span className="sim-log-time">{L.split('] ')[0]}]</span>{L.split('] ')[1]}</p>
+        ))}
+        {simState.status==='running' && <p className="sim-blink" style={{animation:'pulse 1s infinite'}}>_</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ── REVIEW PANEL ── */
+function RevPanel({ordered, skill}: any) {
+  const [estCost, estHours] = React.useMemo(() => {
+    let cost = 0; let hours = 0;
+    ordered.forEach((id:string) => {
+      const c = ALL.find(x=>x.id===id);
+      if (!c) return;
+      if (c.s === 4) { cost += 1500; hours += 16; }
+      else if (c.s === 3) { cost += 200; hours += 4; }
+      else if (c.s === 2) { cost += 40; hours += 1.5; }
+      else { cost += 10; hours += 0.5; }
+    });
+    return [cost, hours];
+  }, [ordered]);
+
+  return (
+    <div className="pcontent">
+      <div className="ptitle">Pipeline Review</div>
+      <div className="rev-doc">
+        <h3 style={{fontSize:14,color:'var(--text)',marginBottom:6}}>Deployment Summary</h3>
+        <p style={{fontSize:11,color:'var(--text2)',lineHeight:1.5}}>
+          This pipeline contains {ordered.length} components across {new Set(ordered.map((id:string)=>ALL.find(c=>c.id===id)?.s)).size} stages. 
+          Configured for {skill} level infrastructure.
+        </p>
+        
+        <div className="rev-grid">
+          <div className="rev-stat"><div className="rev-stat-val">${estCost}</div><div className="rev-stat-lbl">Est. Compute Cost</div></div>
+          <div className="rev-stat"><div className="rev-stat-val">{estHours}h</div><div className="rev-stat-lbl">Est. Exec Time</div></div>
+          <div className="rev-stat"><div className="rev-stat-val">{ordered.some((id:string)=>ALL.find(c=>c.id===id)?.s===4) ? 'A100 x8' : 'L40S x2'}</div><div className="rev-stat-lbl">Rec. Hardware</div></div>
+          <div className="rev-stat"><div className="rev-stat-val">{ordered.length}</div><div className="rev-stat-lbl">Total Steps</div></div>
+        </div>
+
+        <div className="rev-list">
+          <strong style={{color:'var(--text)',marginBottom:8,display:'block'}}>Stage Breakdown</strong>
+          {STAGES.map(st => {
+            const count = ordered.filter((id:string)=>ALL.find(c=>c.id===id)?.s === st.id).length;
+            if (count===0) return null;
+            return <div className="rev-li" key={st.id}><span>{st.label}</span><strong>{count} blocks</strong></div>;
+          })}
+        </div>
+
+        <button className="rev-action" onClick={()=>alert('Deployment pipeline configured. Submitting via API...\n(Simulated)')}>Submit for Deployment ›</button>
+      </div>
+    </div>
+  );
+}
+
 /* ── APP ── */
 export default function App(){
   const [skill,setSkill]=useState('beginner');
@@ -661,9 +764,11 @@ export default function App(){
   const [nodes,setNodes]=useState<string[]>([]);
   const [sel,setSel]=useState<string|null>(null);
   const [tab,setTab]=useState('state');
+  const [viewMode,setViewMode]=useState<'build'|'simulate'|'review'>('build');
   const [showTmpl,setShowTmpl]=useState(false);
   const [dragOver,setDragOver]=useState(false);
   const [toast,setToast]=useState<string|null>(null);
+  const [simState,setSimState]=useState({ activeIdx: -1, logs: [] as string[], status: 'idle' });
 
   const notify=(msg:string)=>{setToast(msg);setTimeout(()=>setToast(null),2500);};
 
@@ -709,9 +814,9 @@ export default function App(){
         <div className="logo">🧠 NeMo Studio UI</div>
         <div className="proj-badge"><span className="proj-dot"/>Project: Alpha Pipeline</div>
         <div className="tab-grp">
-          <button className="tab active">Build</button>
-          <button className="tab" onClick={()=>notify('Simulate — coming soon')}>Simulate</button>
-          <button className="tab" onClick={()=>notify('Review — coming soon')}>Review</button>
+          <button className={`tab ${viewMode==='build'?'active':''}`} onClick={()=>setViewMode('build')}>Build</button>
+          <button className={`tab ${viewMode==='simulate'?'active':''}`} onClick={()=>setViewMode('simulate')}>Simulate</button>
+          <button className={`tab ${viewMode==='review'?'active':''}`} onClick={()=>setViewMode('review')}>Review</button>
         </div>
         <div className="skill-tog">
           {['beginner','intermediate','advanced'].map(s=>{
@@ -772,7 +877,8 @@ export default function App(){
                     <React.Fragment key={id}>
                       {i>0&&<div className="arrow"><div className="aline"/></div>}
                       <PNode comp={comp} selected={sel===id}
-                        onClick={(nid:string)=>{setSel(nid);setTab('guide');}}
+                        status={viewMode==='simulate' ? (i < simState.activeIdx ? 'done' : i === simState.activeIdx ? 'running' : 'pending') : undefined}
+                        onClick={(nid:string)=>{setSel(nid);setTab('guide');setViewMode('build');}}
                         onRemove={handleRemove}/>
                     </React.Fragment>
                   );
@@ -785,11 +891,21 @@ export default function App(){
         {/* RIGHT PANEL */}
         <div className="rpanel">
           <div className="ptabs">
-            <div className={`ptab${tab==='state'?' active':''}`} onClick={()=>setTab('state')}>Pipeline State</div>
-            <div className={`ptab${tab==='guide'?' active':''}`} onClick={()=>setTab('guide')}>Educator Guide</div>
+            {viewMode === 'build' ? (
+              <>
+                <div className={`ptab${tab==='state'?' active':''}`} onClick={()=>setTab('state')}>Pipeline State</div>
+                <div className={`ptab${tab==='guide'?' active':''}`} onClick={()=>setTab('guide')}>Educator Guide</div>
+              </>
+            ) : viewMode === 'simulate' ? (
+              <div className="ptab active">Simulation Run</div>
+            ) : (
+              <div className="ptab active">Review & Deploy</div>
+            )}
           </div>
-          {tab==='state'&&<ValPanel nodes={nodes} skill={skill} onAutofix={handleAutofix}/>}
-          {tab==='guide'&&<EduPanel sel={selComp}/>}
+          {viewMode === 'build' && tab==='state'&&<ValPanel nodes={nodes} skill={skill} onAutofix={handleAutofix}/>}
+          {viewMode === 'build' && tab==='guide'&&<EduPanel sel={selComp}/>}
+          {viewMode === 'simulate' && <SimPanel ordered={ordered} simState={simState} setSimState={setSimState} notify={notify}/>}
+          {viewMode === 'review' && <RevPanel ordered={ordered} skill={skill}/>}
         </div>
       </div>
 
