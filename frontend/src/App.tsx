@@ -211,9 +211,8 @@ const TEMPLATES=[
 /* ── SKILL BADGE ── */
 function SkillBadge({sk,inline}: {sk:string; inline?:boolean;}){
   const cl=sk;
-  const dot=(SKCL as any)[sk];
-  const style=inline?{position:'static' as any, fontSize:'8px',padding:'2px 6px'}:{};
-  return <div className={`skbadge ${cl}`} style={style}><span className="skdot" style={{background:dot}}/>{sk.toUpperCase()}</div>;
+  const style=inline?{position:'static' as any, margin:'0'}:{};
+  return <div className={`skbadge ${cl}`} style={style} title={sk.toUpperCase()} />;
 }
 
 /* ── COMP CARD ── */

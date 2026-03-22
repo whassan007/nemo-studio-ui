@@ -72,11 +72,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .cc-desc{font-size:11px;color:var(--text2);line-height:1.5;}
 
 /* Skill badge — top-right like screenshot */
-.skbadge{position:absolute;top:9px;right:10px;font-size:9px;font-weight:700;letter-spacing:.7px;padding:3px 9px;border-radius:5px;display:flex;align-items:center;gap:4px;white-space:nowrap;}
-.skbadge.beginner{background:var(--cbg);color:var(--ccl);}
-.skbadge.intermediate{background:var(--ibg);color:var(--icl);}
-.skbadge.advanced{background:var(--abg);color:var(--acl);}
-.skdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.skbadge{position:absolute;top:12px;right:12px;width:8px;height:8px;border-radius:50%;}
+.skbadge.beginner{background:var(--ccl);box-shadow:0 0 8px var(--cbg);}
+.skbadge.intermediate{background:var(--icl);box-shadow:0 0 8px var(--ibg);}
+.skbadge.advanced{background:var(--acl);box-shadow:0 0 8px var(--abg);}
+.skdot{display:none;}
 
 /* CANVAS */
 .canvas-wrap{flex:1;position:relative;overflow:hidden;background:var(--bg);background-image:radial-gradient(circle at 1px 1px,#1e2336 1px,transparent 0);background-size:26px 26px;}
