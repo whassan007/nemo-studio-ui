@@ -185,17 +185,248 @@ const ALL=[
 ];
 
 /* ── VALIDATION RULES ── */
-const RULES=[
-  {id:'no-ds',    check:(ns:string[])=>ns.length>0&&!ns.some(n=>ALL.find(c=>c.id===n)?.s===1),        type:'error',title:'No Dataset Configured',
-    msgs:{beginner:'Every pipeline needs a data source first. Add an Original Data block.',intermediate:'Pipeline missing Stage 1 (Dataset) block.',advanced:'No Stage 1 node — pipeline cannot execute without a data source.'},autofix:'orig-data'},
-  {id:'no-eval',  check:(ns:string[])=>ns.some(n=>ALL.find(c=>c.id===n)?.s===4)&&!ns.some(n=>ALL.find(c=>c.id===n)?.s===5), type:'error',title:'Missing Evaluation Gate',
-    msgs:{beginner:'Your pipeline trains a model but never checks if it improved. Add a check step.',intermediate:'Training block without downstream Evaluation. Add Rule-based Eval or LLM-as-a-Judge.',advanced:'Model block has no downstream Evaluation gate. Risk of silent regression.'},autofix:'rule-eval'},
-  {id:'no-pii',   check:(ns:string[])=>ns.includes('orig-data')&&!ns.includes('pii-filter'),          type:'warn', title:'No PII Protection',
-    msgs:{beginner:'Your data may contain personal info. Add a PII Filter to protect privacy.',intermediate:'User-provided data without PII removal — recommended for GDPR/CCPA compliance.',advanced:'Original Data missing PII redaction filter. Required for regulated environments.'},autofix:'pii-filter'},
-  {id:'no-dedup', check:(ns:string[])=>ns.some(n=>ALL.find(c=>c.id===n)?.s===4)&&!ns.some(n=>['dedup-exact','dedup-fuzzy','dedup-sem','dedup-gpu'].includes(n)), type:'warn', title:'No Deduplication',
-    msgs:{beginner:'Training on duplicate data hurts quality. Add a dedup step.',intermediate:'Training without deduplication. Recommend Exact or Fuzzy Dedup.',advanced:'Training pipeline missing deduplication. MinHash+LSH Fuzzy Dedup recommended.'},autofix:'dedup-exact'},
-  {id:'synth-nf', check:(ns:string[])=>ns.some(n=>ALL.find(c=>c.id===n)?.s===3)&&!ns.some(n=>['quality-rule','quality-cls','synth-filter'].includes(n)), type:'warn', title:'Synthetic Data Unfiltered',
-    msgs:{beginner:'Synthetic data can have errors. Add a quality check after generation.',intermediate:'Synthetic Gen without downstream quality filter. Recommend Quality Classifier.',advanced:'SDG pipeline missing quality filtering gate. Synthetic noise will propagate to training.'},autofix:'quality-rule'},
+type RuleSeverity = 'error'|'warn'|'info';
+type Skill = 'beginner'|'intermediate'|'advanced';
+
+type Rule = {
+  id: string;
+  category: string;
+  check: (ns: string[]) => boolean;
+  type: RuleSeverity | ((skill: Skill) => RuleSeverity | null);
+  title: string;
+  msgs: string | ((skill: Skill) => string);
+  autofix?: string;
+};
+
+const RULES: Rule[] = [
+  // A1: Stage Gap Detection
+  {
+    id: 'a1-gap', category: 'Flow',
+    check: (ns) => {
+      const stages = Array.from(new Set(ns.map(n => ALL.find(c=>c.id===n)?.s).filter(Boolean) as number[])).sort();
+      for (let i = 1; i < stages.length; i++) {
+        if (stages[i] - stages[i-1] > 1) return true;
+      }
+      return false;
+    },
+    type: 'warn', title: 'Pipeline Stage Gap',
+    msgs: 'Your data skips one or more stages (e.g., from ingestion directly to training). This is valid but unusual — are you sure you want to skip intermediate steps?',
+  },
+  // A2: Orphaned Terminal Components
+  {
+    id: 'a2-orphan', category: 'Flow',
+    check: (ns) => {
+      const has5or6 = ns.some(n => { const s = ALL.find(c=>c.id===n)?.s; return s===5||s===6; });
+      const has3or4 = ns.some(n => { const s = ALL.find(c=>c.id===n)?.s; return s===3||s===4; });
+      return has5or6 && !has3or4;
+    },
+    type: 'warn', title: 'Orphaned Output Component',
+    msgs: 'You have Evaluation or Export blocks, but no upstream Training or Synthetic generation. Evaluation with nothing to evaluate is a dead end.'
+  },
+  // A3: Preprocessing Without Destination
+  {
+    id: 'a3-pre-deadend', category: 'Flow',
+    check: (ns) => {
+      const has2 = ns.some(n => ALL.find(c=>c.id===n)?.s === 2);
+      const has3456 = ns.some(n => { const s = ALL.find(c=>c.id===n)?.s; return s&&s>=3; });
+      return has2 && !has3456;
+    },
+    type: (skill) => skill === 'beginner' ? null : 'warn', 
+    title: 'Preprocessing Without Destination',
+    msgs: 'You have preprocessing steps but nothing that consumes the cleaned data.'
+  },
+
+  // B1: No Artifact Output
+  {
+    id: 'b1-no-art', category: 'Output',
+    check: (ns) => {
+      const has4 = ns.some(n => ALL.find(c=>c.id===n)?.s === 4);
+      const has5or6 = ns.some(n => { const s = ALL.find(c=>c.id===n)?.s; return s===5||s===6; });
+      return has4 && !has5or6;
+    },
+    type: 'warn', title: 'No Artifact Output',
+    msgs: 'Your pipeline trains a model but produces no output artifact or evaluation. Add an Export or Evaluation block.'
+  },
+  // B2: Evaluation Without Artifact
+  {
+    id: 'b2-eval-no-art', category: 'Output',
+    check: (ns) => {
+      const has5 = ns.some(n => ALL.find(c=>c.id===n)?.s === 5);
+      const has4 = ns.some(n => ALL.find(c=>c.id===n)?.s === 4);
+      return has5 && !has4;
+    },
+    type: (skill) => skill === 'beginner' ? 'warn' : 'info',
+    title: 'Evaluation Without Artifact',
+    msgs: 'You are evaluating without a training step. This is only valid if you are loading a pre-trained model externally.'
+  },
+  // B3: Export Without Evaluation
+  {
+    id: 'b3-exp-no-eval', category: 'Output',
+    check: (ns) => {
+      const has6 = ns.some(n => ALL.find(c=>c.id===n)?.s === 6);
+      const has5 = ns.some(n => ALL.find(c=>c.id===n)?.s === 5);
+      const has4 = ns.some(n => ALL.find(c=>c.id===n)?.s === 4);
+      return has6 && !has5 && has4;
+    },
+    type: 'warn', title: 'Export Without Evaluation',
+    msgs: 'You are exporting a model without an evaluation gate. Consider adding Rule-based Eval or MMLU before export.',
+    autofix: 'rule-eval'
+  },
+
+  // C1: Alignment Without SFT
+  {
+    id: 'c1-align-no-sft', category: 'Prerequisite',
+    check: (ns) => {
+      const align = ['dpo','ppo','grpo','rlhf'];
+      const sft = ['sft','instr-tuning'];
+      return ns.some(n => align.includes(n)) && !ns.some(n => sft.includes(n));
+    },
+    type: (skill) => skill === 'beginner' ? null : 'warn',
+    title: 'Alignment Without SFT',
+    msgs: 'Alignment techniques like DPO work best after supervised fine-tuning. Consider adding SFT before alignment.',
+    autofix: 'sft'
+  },
+  // C2: Compression Without Model
+  {
+    id: 'c2-comp-no-model', category: 'Prerequisite',
+    check: (ns) => {
+      const comp = ns.some(n => ALL.find(c=>c.id===n)?.sg === 'Compression');
+      const train = ns.some(n => { const c = ALL.find(x=>x.id===n); return c?.s===4 && c?.sg !== 'Compression'; });
+      return comp && !train;
+    },
+    type: 'error', title: 'Compression Without a Model',
+    msgs: 'Compression techniques require a trained model. Add a Train Model or SFT block upstream.',
+    autofix: 'train-model'
+  },
+  // C3: Reward Model Without Preference Data
+  {
+    id: 'c3-rm-no-pref', category: 'Prerequisite',
+    check: (ns) => {
+      const rm = ns.includes('reward-model');
+      const hasSynthLabel = ns.some(n => ['synth-gen','nemotron-reward','openai-sdg'].includes(n));
+      return rm && !hasSynthLabel;
+    },
+    type: (skill) => skill === 'advanced' ? 'warn' : null,
+    title: 'Reward Model Without Preference Data',
+    msgs: 'Reward Model Training requires preference data (chosen/rejected pairs). Your current data source may not produce this format.'
+  },
+  // C4: Semantic Dedup Without Embeddings
+  {
+    id: 'c4-sem-dedup-embed', category: 'Prerequisite',
+    check: (ns) => ns.includes('dedup-sem') && !ns.includes('nemo-retriever'), 
+    type: (skill) => skill === 'beginner' ? null : 'info',
+    title: 'Semantic Deduplication Without Embeddings',
+    msgs: 'Semantic Dedup requires a running embedding model endpoint — NeMo Retriever or a custom embedding API.'
+  },
+  // C5: LoRA Serving Without LoRA Training
+  {
+    id: 'c5-lora-serve-no-train', category: 'Prerequisite',
+    check: (ns) => (ns.includes('lora-serving') || ns.includes('lora-nim')) && !ns.includes('lora'),
+    type: (skill) => skill === 'beginner' ? null : 'warn',
+    title: 'LoRA Serving Without LoRA Training',
+    msgs: 'LoRA Serving requires LoRA adapters produced during training. Add LoRA to your Training stage.',
+    autofix: 'lora'
+  },
+  // C6: RAG Without Retriever
+  {
+    id: 'c6-rag-no-pipe', category: 'Prerequisite',
+    check: (ns) => ns.includes('nemo-retriever') && !ns.some(n=> ALL.find(c=>c.id===n)?.s===1),
+    type: (skill) => skill === 'beginner' ? null : 'warn',
+    title: 'RAG Without Document Pipeline',
+    msgs: 'RAG deployment requires an embedding pipeline and vector store. Add semantic search or retriever components upstream.'
+  },
+
+  // D1: Conflicting Deduplication Methods
+  {
+    id: 'd1-conflict-dedup', category: 'Coherence',
+    check: (ns) => {
+      const count = ['dedup-exact','dedup-fuzzy','dedup-sem'].filter(n => ns.includes(n)).length;
+      return count >= 2;
+    },
+    type: (skill) => skill === 'advanced' ? 'info' : null,
+    title: 'Conflicting Deduplication Methods',
+    msgs: 'You have multiple deduplication methods active. Semantic Dedup is the most thorough but most expensive. Consider whether all are necessary.'
+  },
+  // D2: Redundant Quality Filters
+  {
+    id: 'd2-redundant-quality', category: 'Coherence',
+    check: (ns) => {
+      const count = ['quality-rule','quality-cls','heuristic-flt'].filter(n => ns.includes(n)).length;
+      return count >= 2;
+    },
+    type: (skill) => skill === 'beginner' ? null : 'info',
+    title: 'Redundant Quality Filters',
+    msgs: 'You have multiple quality filtering methods. For most pipelines, one classifier is sufficient. Multiple filters may over-prune your dataset.'
+  },
+  // D3: Compression After Alignment
+  {
+    id: 'd3-comp-after-align', category: 'Coherence',
+    check: (ns) => {
+      const align = ['dpo','ppo','grpo','rlhf'].some(n=>ns.includes(n));
+      const comp = ns.some(n => ALL.find(c=>c.id===n)?.sg === 'Compression');
+      return align && comp;
+    },
+    type: (skill) => skill === 'advanced' ? 'warn' : null,
+    title: 'Compression After Alignment',
+    msgs: 'Quantizing after alignment can degrade preference learning. Consider quantizing before alignment or re-evaluating after compression.'
+  },
+  // D4: Full SFT + LoRA Together
+  {
+    id: 'd4-sft-lora', category: 'Coherence',
+    check: (ns) => ns.includes('sft') && ns.includes('lora'),
+    type: (skill) => skill === 'beginner' ? null : 'info',
+    title: 'Full SFT + LoRA Together',
+    msgs: 'You have both full-parameter SFT and LoRA. If these are sequential, that is a valid multi-stage approach. If parallel, one is redundant.'
+  },
+  // D5: Synthetic -> Training Filtering
+  {
+    id: 'd5-synth-no-filt', category: 'Coherence',
+    check: (ns) => {
+      const synth = ns.some(n => ALL.find(c=>c.id===n)?.s === 3);
+      const train = ns.some(n => ALL.find(c=>c.id===n)?.s === 4);
+      const filter = ns.some(n => ['synth-filter','quality-cls','quality-rule'].includes(n));
+      return synth && train && !filter;
+    },
+    type: 'warn', title: 'Synthetic Data Skipping Filtering',
+    msgs: 'Synthetic data feeds directly into training without a quality filter. Synthetic noise will propagate to training.'
+  },
+
+  // E1: Training Heavy, Eval Light
+  {
+    id: 'e1-train-heavy', category: 'Balance',
+    check: (ns) => {
+      const tc = ns.filter(n => ALL.find(c=>c.id===n)?.s === 4).length;
+      const ec = ns.filter(n => ALL.find(c=>c.id===n)?.s === 5).length;
+      return tc >= 8 && ec <= 1; 
+    },
+    type: (skill) => skill === 'beginner' ? null : 'info',
+    title: 'Training Heavy, Eval Light',
+    msgs: 'Your pipeline has extensive training configuration but minimal evaluation. Consider adding benchmarks or LLM-as-a-Judge to match the training depth.'
+  },
+  // E2: Over-Preprocessing
+  {
+    id: 'e2-over-pre', category: 'Balance',
+    check: (ns) => {
+      const p2 = ns.filter(n => ALL.find(c=>c.id===n)?.s === 2).length;
+      const t4 = ns.filter(n => ALL.find(c=>c.id===n)?.s === 4).length;
+      return p2 > 6 && t4 === 1;
+    },
+    type: (skill) => skill === 'advanced' ? 'info' : null,
+    title: 'Over-Preprocessing',
+    msgs: 'Your preprocessing pipeline is highly detailed. Make sure your training configuration matches this level of data quality investment.'
+  },
+  // E3: Export Without Infrastructure
+  {
+    id: 'e3-exp-no-infra', category: 'Balance',
+    check: (ns) => {
+      const exp = ns.includes('trt-llm') || ns.includes('nim');
+      const infra = ns.some(n => ALL.find(c=>c.id===n)?.sg === 'Infrastructure');
+      return exp && !infra;
+    },
+    type: (skill) => skill === 'advanced' ? 'info' : null,
+    title: 'Export Without Infrastructure',
+    msgs: 'TensorRT-LLM and NIM require serving infrastructure. Add Triton Server or Kubernetes to complete your deployment configuration.'
+  }
 ];
 
 /* ── TEMPLATES ── */
@@ -309,7 +540,19 @@ function PNode({comp,selected,onClick,onRemove}: any){
 
 /* ── VALIDATION PANEL ── */
 function ValPanel({nodes,skill,onAutofix}: any){
-  const active=RULES.filter(r=>r.check(nodes));
+  const active = RULES.map(r => {
+    if (!r.check(nodes)) return null;
+    const severity = typeof r.type === 'function' ? r.type(skill) : r.type;
+    if (!severity) return null;
+    const msg = typeof r.msgs === 'function' ? r.msgs(skill) : r.msgs;
+    return { ...r, severity, msg };
+  }).filter(Boolean) as any[];
+
+  active.sort((a,b) => {
+    const w = {error: 3, warn: 2, info: 1};
+    return (w as any)[b.severity] - (w as any)[a.severity];
+  });
+
   const checklist=[
     {l:'Dataset Provided',      done:nodes.some((n:string)=>ALL.find(c=>c.id===n)?.s===1)},
     {l:'Preprocessing Strategy',done:nodes.some((n:string)=>ALL.find(c=>c.id===n)?.s===2)},
@@ -325,9 +568,9 @@ function ValPanel({nodes,skill,onAutofix}: any){
       {active.map(r=>{
         const fc=ALL.find(c=>c.id===r.autofix);
         return(
-          <div key={r.id} className={`vcard ${r.type}`}>
-            <div className={`vtitle ${r.type}`}>{r.type==='error'?'⚠️':'ℹ️'} {r.title}</div>
-            <div className="vbody">{(r.msgs as any)[skill]}</div>
+          <div key={r.id} className={`vcard ${r.severity}`}>
+            <div className={`vtitle ${r.severity}`}>{r.severity==='error'?'⚠️':r.severity==='warn'?'⚠️':'ℹ️'} {r.title}</div>
+            <div className="vbody">{r.msg}</div>
             {fc&&<button className="afix-btn" onClick={()=>onAutofix(r.autofix)}>Auto-fix: Add {fc.name}</button>}
           </div>
         );
