@@ -855,42 +855,52 @@ export default function App(){
           onDragOver={e=>{e.preventDefault();setDragOver(true);}}
           onDragLeave={()=>setDragOver(false)}
           onDrop={handleDrop}>
-          {dragOver&&<div className="drop-hint"/>}
-          <div className="lane-lines">{STAGES.map(s=><div className="lane" key={s.id}/>)}</div>
           <div className="zoom-ctrls">
             <button onClick={(e)=>{e.stopPropagation();setZoom(z=>Math.max(0.4, z - 0.1));}}>−</button>
             <span>{Math.round(zoom * 100)}%</span>
             <button onClick={(e)=>{e.stopPropagation();setZoom(z=>Math.min(2.0, z + 0.1));}}>+</button>
           </div>
-          {nodes.length===0&&!dragOver&&(
-            <div className="canvas-empty">
-              <div className="ce-icon">⬡</div>
-              <div className="ce-title">Drag components to build your pipeline</div>
-              <div className="ce-sub">
-                {skill==='beginner'
-                  ?'Start with "Original Data" from the Dataset section on the left sidebar.'
-                  :`${visCount} components available at ${skill} level. Load a template or drag components to start.`}
-              </div>
+          
+          <div className="pipe-scroll" onWheel={(e)=>{
+            if(e.ctrlKey||e.metaKey) {
+              setZoom(z => Math.max(0.4, Math.min(2.0, z + (e.deltaY < 0 ? 0.05 : -0.05))));
+            }
+          }}>
+            <div className="canvas-inner" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', minWidth: '100%', minHeight: '100%', position: 'relative', display: 'inline-block' }}>
+              <div className="lane-lines" style={{ position: 'absolute', inset: 0, minWidth: '1200px' }}>{STAGES.map(s=><div className="lane" key={s.id}/>)}</div>
+              
+              {dragOver&&<div className="drop-hint"/>}
+              
+              {nodes.length===0&&!dragOver&&(
+                <div className="canvas-empty">
+                  <div className="ce-icon">⬡</div>
+                  <div className="ce-title">Drag components to build your pipeline</div>
+                  <div className="ce-sub">
+                    {skill==='beginner'
+                      ?'Start with "Original Data" from the Dataset section on the left sidebar.'
+                      :`${visCount} components available at ${skill} level. Load a template or drag components to start.`}
+                  </div>
+                </div>
+              )}
+              
+              {ordered.length>0&&(
+                <div className="pipe-nodes" style={{ position: 'relative', zIndex: 10, padding: '32px 24px' }}>
+                  {ordered.map((id,i)=>{
+                    const comp=ALL.find(c=>c.id===id);
+                    if(!comp)return null;
+                    return(
+                      <React.Fragment key={id}>
+                        {i>0&&<div className="arrow"><div className="aline"/></div>}
+                        <PNode comp={comp} selected={sel===id}
+                          status={viewMode==='simulate' ? (i < simState.activeIdx ? 'done' : i === simState.activeIdx ? 'running' : 'pending') : undefined}
+                          onClick={(nid:string)=>{setSel(nid);setTab('guide');setViewMode('build');}}
+                          onRemove={handleRemove}/>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-          <div className="pipe-scroll">
-            {ordered.length>0&&(
-              <div className="pipe-nodes" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.1s ease' }}>
-                {ordered.map((id,i)=>{
-                  const comp=ALL.find(c=>c.id===id);
-                  if(!comp)return null;
-                  return(
-                    <React.Fragment key={id}>
-                      {i>0&&<div className="arrow"><div className="aline"/></div>}
-                      <PNode comp={comp} selected={sel===id}
-                        status={viewMode==='simulate' ? (i < simState.activeIdx ? 'done' : i === simState.activeIdx ? 'running' : 'pending') : undefined}
-                        onClick={(nid:string)=>{setSel(nid);setTab('guide');setViewMode('build');}}
-                        onRemove={handleRemove}/>
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
 
