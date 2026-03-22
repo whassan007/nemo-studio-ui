@@ -14,5 +14,11 @@ backend/static/models/*.bin
 knowledge_source/slides_history/*.pptx
 backend/static/images/DLI_Header.png
 
-# Excluded post-audit to protect DLI workshop content
+# Excluded post-audit to p.vercel
+.output
+.nuxt
+
+# NeMo Studio UI Ignores
 knowledge_source/
+.firebase/
+tmp-hf-space/
