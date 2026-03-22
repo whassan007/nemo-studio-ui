@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import './index.css';
 
 /* ── STAGE DEFINITIONS ── */
-const STAGES=[
+export const STAGES=[
   {id:1,label:'1. Dataset',       color:'#00c896',cls:'sc1'},
   {id:2,label:'2. Preprocessing', color:'#3b82f6',cls:'sc2'},
   {id:3,label:'3. Synthetic Data',color:'#a855f7',cls:'sc3'},
@@ -18,7 +18,7 @@ const SKDOT: Record<string, string>={beginner:'🟢',intermediate:'🟡',advance
 const SKRANK: Record<string, number>={beginner:0,intermediate:1,advanced:2};
 
 /* ── ALL 147 COMPONENTS ── */
-const ALL=[
+export const ALL=[
   /* STAGE 1 — DATASET (9) */
   {id:'orig-data',      s:1,sk:'beginner',    sg:'Sources',       icon:'🗄️', name:'Original Data',               desc:'Upload raw .csv or .json files directly.'},
   {id:'hf-hub',         s:1,sk:'intermediate',sg:'Sources',       icon:'🤗', name:'HuggingFace Hub',             desc:'Pull datasets via HF Datasets API.'},
@@ -151,7 +151,7 @@ const ALL=[
   {id:'e2e-eval',       s:5,sk:'advanced',    sg:'Tooling',       icon:'🔁', name:'End-to-End Eval',             desc:'Full pipeline application evaluation.'},
 
   /* STAGE 6 — EXPORT & DEPLOYMENT (31) */
-  {id:'hf-export',      s:6,sk:'intermediate',sg:'Serving',       icon:'🤗', name:'HuggingFace Export',          desc:'Push model weights to HF Hub.'},
+  {id:'hf-export',      s:6,sk:'beginner',    sg:'Serving',       icon:'🤗', name:'HuggingFace Export',          desc:'Push model weights to HF Hub.'},
   {id:'onnx-export',    s:6,sk:'intermediate',sg:'Serving',       icon:'📦', name:'ONNX / PyTorch Export',       desc:'Export to standard inference formats.'},
   {id:'trt-llm',        s:6,sk:'advanced',    sg:'Serving',       icon:'🚀', name:'TensorRT-LLM Engine',         desc:'NVIDIA optimized inference engine build.'},
   {id:'trt-compile',    s:6,sk:'advanced',    sg:'Serving',       icon:'⚙️', name:'TRT-LLM Compilation',         desc:'Kernel fusion and graph optimization.'},
@@ -198,7 +198,7 @@ type Rule = {
   autofix?: string;
 };
 
-const RULES: Rule[] = [
+export const RULES: Rule[] = [
   // A1: Stage Gap Detection
   {
     id: 'a1-gap', category: 'Flow',
@@ -430,12 +430,12 @@ const RULES: Rule[] = [
 ];
 
 /* ── TEMPLATES ── */
-const TEMPLATES=[
+export const TEMPLATES=[
   {id:'basic',    name:'Basic Domain Fine-Tune',        sk:'beginner',    desc:'Simplest pipeline to fine-tune on your own documents.',                     nodes:['orig-data','cleanse','pii-filter','sft','rule-eval','hf-export']},
   {id:'synth',    name:'Synthetic Data Augmentation',   sk:'intermediate',desc:'Augment data with synthetic variations before fine-tuning.',                 nodes:['orig-data','cleanse','dedup-exact','quality-cls','synth-gen','synth-filter','sft','llm-judge','hf-export']},
   {id:'rag',      name:'RAG Evaluation Pipeline',       sk:'intermediate',desc:'Evaluate retrieval-augmented generation quality.',                           nodes:['orig-data','quality-rule','llm-judge','mmlu','rouge','e2e-eval','nemo-retriever']},
   {id:'compress', name:'Model Compression Workflow',    sk:'advanced',    desc:'Prune, distill, and quantize for edge or constrained deployments.',          nodes:['orig-data','cleanse','train-model','depth-pruning','soft-distill','fp8-quant','bias-eval','trt-llm','genai-perf']},
-  {id:'sov',      name:'Sovereign LLM — Full Pipeline', sk:'advanced',    desc:'DAPT → SFT → RLHF → NeMo Evaluator → NIM deploy.',                        nodes:['common-crawl','contam-filter','dedup-fuzzy','multilingual-dc','dapt','sft','dpo','reward-model','rlhf','nemo-evaluator','e2e-eval','nim','guardrails']},
+  {id:'sov',      name:'Sovereign LLM — Full Pipeline', sk:'advanced',    desc:'DAPT → SFT → RLHF → NeMo Evaluator → NIM deploy.',                        nodes:['common-crawl','contam-filter','dedup-fuzzy','multilingual-dc','dapt','synth-gen','sft','dpo','reward-model','rlhf','nemo-evaluator','e2e-eval','nim','guardrails']},
   {id:'class',    name:'Classroom Starter',             sk:'beginner',    desc:'Minimal pipeline for students learning LLM fundamentals.',                   nodes:['orig-data','cleanse','synth-gen','train-model','rule-eval']},
 ];
 
@@ -769,6 +769,7 @@ export default function App(){
   const [dragOver,setDragOver]=useState(false);
   const [toast,setToast]=useState<string|null>(null);
   const [simState,setSimState]=useState({ activeIdx: -1, logs: [] as string[], status: 'idle' });
+  const [zoom,setZoom]=useState(1);
 
   const notify=(msg:string)=>{setToast(msg);setTimeout(()=>setToast(null),2500);};
 
@@ -856,6 +857,11 @@ export default function App(){
           onDrop={handleDrop}>
           {dragOver&&<div className="drop-hint"/>}
           <div className="lane-lines">{STAGES.map(s=><div className="lane" key={s.id}/>)}</div>
+          <div className="zoom-ctrls">
+            <button onClick={(e)=>{e.stopPropagation();setZoom(z=>Math.max(0.4, z - 0.1));}}>−</button>
+            <span>{Math.round(zoom * 100)}%</span>
+            <button onClick={(e)=>{e.stopPropagation();setZoom(z=>Math.min(2.0, z + 0.1));}}>+</button>
+          </div>
           {nodes.length===0&&!dragOver&&(
             <div className="canvas-empty">
               <div className="ce-icon">⬡</div>
@@ -869,7 +875,7 @@ export default function App(){
           )}
           <div className="pipe-scroll">
             {ordered.length>0&&(
-              <div className="pipe-nodes">
+              <div className="pipe-nodes" style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', transition: 'transform 0.1s ease' }}>
                 {ordered.map((id,i)=>{
                   const comp=ALL.find(c=>c.id===id);
                   if(!comp)return null;
